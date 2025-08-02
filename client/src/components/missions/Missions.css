@@ -1,0 +1,148 @@
+/* Styles pour les composants de missions */
+
+.missions-container {
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.mission-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  overflow: hidden;
+}
+
+.mission-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+.mission-card .card-header {
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+.mission-card .card-title {
+  font-weight: 600;
+  color: #333;
+}
+
+.mission-details p {
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.mission-details .badge {
+  font-size: 0.8rem;
+  padding: 0.35em 0.65em;
+}
+
+/* Styles pour les détails de mission */
+.mission-detail-header {
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  border-left: 5px solid #007bff;
+}
+
+.mission-status-badge {
+  font-size: 1rem;
+  padding: 0.5em 1em;
+}
+
+.mission-action-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.mission-section {
+  margin-bottom: 30px;
+}
+
+.mission-section-title {
+  border-bottom: 2px solid #e9ecef;
+  padding-bottom: 10px;
+  margin-bottom: 20px;
+  color: #495057;
+}
+
+/* Styles pour le formulaire d'ajout d'heures */
+.work-hours-form {
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+/* Styles pour la liste des heures travaillées */
+.work-hours-list {
+  margin-top: 20px;
+}
+
+.work-hours-item {
+  border-left: 3px solid #6c757d;
+  padding-left: 15px;
+  margin-bottom: 15px;
+  transition: border-color 0.3s ease;
+}
+
+.work-hours-item.validated {
+  border-left-color: #28a745;
+}
+
+.work-hours-item.rejected {
+  border-left-color: #dc3545;
+}
+
+.work-hours-item.pending {
+  border-left-color: #ffc107;
+}
+
+.work-hours-date {
+  font-weight: 600;
+  color: #495057;
+}
+
+.work-hours-hours {
+  font-weight: 600;
+  color: #007bff;
+}
+
+.work-hours-description {
+  font-size: 0.9rem;
+  color: #6c757d;
+  margin-top: 5px;
+}
+
+.work-hours-status {
+  font-size: 0.8rem;
+  margin-top: 5px;
+}
+
+/* Styles pour les paiements */
+.payment-card {
+  border-radius: 8px;
+  margin-bottom: 20px;
+  transition: transform 0.3s ease;
+}
+
+.payment-card:hover {
+  transform: translateY(-5px);
+}
+
+.payment-amount {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #28a745;
+}
+
+.payment-date {
+  font-size: 0.9rem;
+  color: #6c757d;
+}
+
+.payment-status {
+  font-size: 0.8rem;
+  padding: 0.35em 0.65em;
+  border-radius: 50px;
+}

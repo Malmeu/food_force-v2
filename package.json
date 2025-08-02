@@ -1,0 +1,23 @@
+{
+  "name": "food_force",
+  "version": "1.0.0",
+  "description": "Plateforme de mise en relation professionnelle pour le secteur de l'hôtellerie et de la restauration au Maroc",
+  "main": "index.js",
+  "scripts": {
+    "start:client": "cd client && npm start",
+    "start:server": "cd server && npm start",
+    "dev": "concurrently \"npm run start:server\" \"npm run start:client\"",
+    "install:all": "npm install && cd client && npm install && cd ../server && npm install"
+  },
+  "keywords": [
+    "emploi",
+    "maroc",
+    "restauration",
+    "hôtellerie"
+  ],
+  "author": "FoodForce Team",
+  "license": "MIT",
+  "dependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

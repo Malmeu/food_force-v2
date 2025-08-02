@@ -1,0 +1,15 @@
+User-agent: *
+Allow: /
+
+# Permettre à tous les robots d'indexer le site
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /verify
+Disallow: /messages
+Disallow: /notifications
+Disallow: /payments
+
+# Sitemap
+Sitemap: https://foodforce.ma/sitemap.xml

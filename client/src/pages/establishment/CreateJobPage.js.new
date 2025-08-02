@@ -1,0 +1,993 @@
+import React, { useState } from 'react';
+import { 
+  Container, Typography, Box, Paper, TextField, Button, FormControl, 
+  InputLabel, Select, MenuItem, Chip, CircularProgress, Alert, Grid, 
+  FormHelperText, Checkbox, FormControlLabel, FormGroup, Divider
+} from '@mui/material';
+import { Formik, Form, Field } from 'formik';
+import * as Yup from 'yup';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
+import { useAuth } from '../../contexts/AuthContext';
+import { jobAPI } from '../../utils/api';
+
+// Constantes pour les options des champs select
+const CONTRACT_TYPES = ['CDI', 'CDD', 'Intérim', 'Extra'];
+
+const SECTORS = ['Restauration', 'Hôtellerie', 'Événementiel', 'Vente', 'Logistique'];
+
+// ATTENTION : ces valeurs doivent correspondre EXACTEMENT aux valeurs attendues par le schu00e9ma MongoDB
+// Les valeurs dans le modèle MongoDB contiennent des caractères échappés (\u00e9 au lieu de é)
+const EXPERIENCE_LEVELS = ['Du00e9butant', 'Intermu00e9diaire', 'Expu00e9rimentu00e9', 'Expert'];
+
+const EDUCATION_LEVELS = ['Aucun diplôme', 'Bac', 'Bac+2', 'Bac+3', 'Bac+5', 'Doctorat'];
+
+const SALARY_PERIODS = ['Heure', 'Jour', 'Mois'];
+
+const WORKING_DAYS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+
+// Fonction pour formater la date au format YYYY-MM-DD
+const formatDate = (date) => {
+  const d = new Date(date);
+  let month = '' + (d.getMonth() + 1);
+  let day = '' + d.getDate();
+  const year = d.getFullYear();
+
+  if (month.length < 2) month = '0' + month;
+  if (day.length < 2) day = '0' + day;
+
+  return [year, month, day].join('-');
+};
+
+const CreateJobPage = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState('');
+
+  // Schéma de validation Yup adapté au modèle MongoDB
+  // Attention : les noms des champs doivent correspondre exactement aux noms des champs dans le modèle MongoDB
+  const validationSchema = Yup.object({
+    // Informations de base de l'offre
+    title: Yup.string()
+      .required('Le titre est requis')
+      .max(100, 'Le titre ne peut pas dépasser 100 caractères')
+      .trim(),
+    
+    description: Yup.string()
+      .required('La description est requise')
+      .min(50, 'La description doit contenir au moins 50 caractères')
+      .trim(),
+    
+    // Type de contrat et secteur d'activité
+    contractType: Yup.string()
+      .required('Le type de contrat est requis')
+      .oneOf(CONTRACT_TYPES, 'Type de contrat invalide'),
+    
+    sector: Yup.string()
+      .required('Le secteur d\'activité est requis')
+      .oneOf(SECTORS, 'Secteur invalide'),
+    
+    // Localisation
+    'location.city': Yup.string()
+      .required('La ville est requise')
+      .trim(),
+    
+    'location.address': Yup.string()
+      .trim(),
+    
+    // Salaire
+    'salary.amount': Yup.number()
+      .positive('Le salaire doit être positif')
+      .required('Le montant du salaire est requis'),
+    
+    'salary.period': Yup.string()
+      .required('La période du salaire est requise')
+      .oneOf(SALARY_PERIODS, 'Période de salaire invalide'),
+    
+    // Compétences requises
+    requiredSkills: Yup.array()
+      .of(Yup.string().trim())
+      .min(1, 'Au moins une compétence est requise'),
+    
+    // Niveau d'expérience et d'éducation
+    experienceLevel: Yup.string()
+      .required('Le niveau d\'expérience est requis')
+      .oneOf(EXPERIENCE_LEVELS, 'Niveau d\'expérience invalide'),
+    
+    educationLevel: Yup.string()
+      .oneOf([...EDUCATION_LEVELS, ''], 'Niveau d\'éducation invalide'),
+    
+    // Dates
+    startDate: Yup.date()
+      .required('La date de début est requise'),
+    
+    applicationDeadline: Yup.date()
+      .nullable()
+      .min(new Date(), 'La date limite de candidature doit être future'),
+    
+    // Jours et heures de travail
+    workingDays: Yup.array()
+      .of(Yup.string().oneOf(WORKING_DAYS, 'Jour de travail invalide'))
+      .min(1, 'Sélectionnez au moins un jour de travail'),
+    
+    'workingHours.start': Yup.string()
+      .required('L\'heure de début est requise')
+      .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Format d\'heure invalide (HH:MM)'),
+    
+    'workingHours.end': Yup.string()
+      .required('L\'heure de fin est requise')
+      .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Format d\'heure invalide (HH:MM)'),
+    
+    // Autres informations
+    numberOfPositions: Yup.number()
+      .positive('Le nombre de postes doit être positif')
+      .integer('Le nombre de postes doit être un entier')
+      .default(1),
+    
+    benefits: Yup.array()
+      .of(Yup.string().trim()),
+    
+    // Champs temporaires pour l'interface utilisateur
+    newSkill: Yup.string(),
+    newBenefit: Yup.string(),
+    
+    // Statut de l'offre
+    isActive: Yup.boolean().default(true)
+  });
+
+  // Calcul de la date limite par défaut (1 mois après aujourd'hui)
+  const defaultDeadline = new Date();
+  defaultDeadline.setMonth(defaultDeadline.getMonth() + 1);
+
+  const initialValues = {
+    title: '',
+    description: '',
+    contractType: CONTRACT_TYPES[0], // CDI par défaut
+    sector: SECTORS[0], // Restauration par défaut
+    location: {
+      city: '',
+      address: '',
+      region: ''
+    },
+    salary: {
+      amount: '',
+      period: SALARY_PERIODS[2], // Mois par défaut
+      currency: 'MAD'
+    },
+    requiredSkills: [],
+    experienceLevel: EXPERIENCE_LEVELS[0], // Débutant par défaut
+    educationLevel: '',
+    startDate: formatDate(new Date()),
+    endDate: '',
+    applicationDeadline: formatDate(defaultDeadline),
+    workingDays: ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi'],
+    workingHours: {
+      start: '09:00',
+      end: '18:00'
+    },
+    numberOfPositions: 1,
+    benefits: [],
+    newSkill: '',
+    newBenefit: '',
+    isActive: true
+  };
+
+  const handleSubmit = async (values, { setSubmitting, resetForm }) => {
+    try {
+      console.log('Début de la soumission du formulaire');
+      setError('');
+      setSuccess(false);
+      
+      // Vérifier l'authentification
+      const token = localStorage.getItem('token');
+      console.log('Token d\'authentification:', token ? `${token.substring(0, 15)}...` : 'Absent');
+      
+      if (!token) {
+        const errMsg = 'Vous n\'êtes pas connecté. Veuillez vous connecter pour créer une offre d\'emploi.';
+        console.error(errMsg);
+        setError(errMsg);
+        toast.error(errMsg);
+        setSubmitting(false);
+        return;
+      }
+      
+      // Tester la connexion API avant de soumettre le formulaire
+      console.log('Test de la connexion API...');
+      const connectionTest = await testApiConnection();
+      console.log('Résultat du test de connexion:', connectionTest);
+      
+      if (!connectionTest.success) {
+        setError(connectionTest.message || 'Problème de connexion. Veuillez vous reconnecter.');
+        toast.error(connectionTest.message || 'Problème de connexion');
+        setSubmitting(false);
+        return;
+      }
+      
+      // Préparer les données pour l'API - format adapté au schéma MongoDB
+      const jobData = {
+        title: values.title,
+        description: values.description,
+        contractType: values.contractType,
+        sector: values.sector,
+        experienceLevel: values.experienceLevel,
+        educationLevel: values.educationLevel || 'Aucun diplôme',
+        location: {
+          city: values.location.city,
+          address: values.location.address || values.location.city
+        },
+        salary: {
+          amount: Number(values.salary.amount),
+          period: values.salary.period,
+          currency: 'MAD'
+        },
+        requiredSkills: values.requiredSkills,
+        benefits: values.benefits || [],
+        workingDays: values.workingDays || ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi'],
+        workingHours: {
+          start: values.workingHours?.start || '09:00',
+          end: values.workingHours?.end || '18:00'
+        },
+        numberOfPositions: Number(values.numberOfPositions) || 1,
+        isActive: values.isActive !== undefined ? values.isActive : true
+      };
+      
+      // Conversion des dates en format ISO
+      try {
+        jobData.startDate = new Date(values.startDate).toISOString();
+      } catch (e) {
+        console.warn('Erreur lors de la conversion de startDate:', e);
+        jobData.startDate = new Date().toISOString();
+      }
+      
+      try {
+        jobData.applicationDeadline = new Date(values.applicationDeadline).toISOString();
+      } catch (e) {
+        console.warn('Erreur lors de la conversion de applicationDeadline:', e);
+        // Date limite par défaut: 1 mois plus tard
+        const deadline = new Date();
+        deadline.setMonth(deadline.getMonth() + 1);
+        jobData.applicationDeadline = deadline.toISOString();
+      }
+      
+      console.log('Données envoyées pour création d\'offre:', jobData);
+
+      // Appel API direct avec gestion d'erreur simplifiée
+      console.log('Envoi des données pour création d\'offre...');
+      
+      // Utilisation de fetch directement pour plus de contrôle
+      console.log('Token d\'authentification déjà récupéré plus haut');
+      
+      // Envoi de la requête avec fetch
+      const directResponse = await fetch('http://localhost:5001/api/jobs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(jobData)
+      });
+      
+      // Récupération de la réponse
+      const responseData = await directResponse.json();
+      console.log('Réponse directe de l\'API:', directResponse.status, responseData);
+      
+      // Vérification du statut de la réponse
+      if (!directResponse.ok) {
+        throw new Error(responseData.message || 'Erreur lors de la création de l\'offre');
+      }
+      
+      // Formatage de la réponse pour la suite du traitement
+      const response = { data: responseData };
+      console.log('Réponse formatée de l\'API:', response);
+    
+      // Extraction de l'ID de l'offre créée
+      let jobId = null;
+      if (response.data) {
+        if (response.data.success && response.data.data && response.data.data._id) {
+          jobId = response.data.data._id;
+        } else if (response.data._id) {
+          jobId = response.data._id;
+        } else if (response.data.data && response.data.data._id) {
+          jobId = response.data.data._id;
+        }
+      }
+      
+      // Succès !
+      setSuccess(true);
+      resetForm();
+      toast.success('Offre d\'emploi créée avec succès!');
+      
+      // Redirection
+      setTimeout(() => {
+        navigate(jobId ? `/establishment/jobs/${jobId}` : '/establishment/jobs');
+      }, 2000);
+      
+    } catch (err) {
+      console.error('Erreur lors de la création de l\'offre:', err);
+      
+      // Gestion simplifiée des erreurs
+      let errorMessage = 'Une erreur est survenue lors de la création de l\'offre.';
+      
+      if (err.response && err.response.data) {
+        if (err.response.data.message) errorMessage = err.response.data.message;
+        else if (err.response.data.error) errorMessage = err.response.data.error;
+        else if (typeof err.response.data === 'string') errorMessage = err.response.data;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Fonction pour ajouter une compétence à la liste
+  const handleAddSkill = (values, setFieldValue) => {
+    if (values.newSkill && !values.requiredSkills.includes(values.newSkill)) {
+      setFieldValue('requiredSkills', [...values.requiredSkills, values.newSkill]);
+      setFieldValue('newSkill', '');
+    }
+  };
+  
+  // Fonction pour tester la connexion API
+  const testApiConnection = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      console.log('Test API - Token:', token ? 'Présent' : 'Absent');
+      
+      if (!token) {
+        return { success: false, message: 'Aucun token d\'authentification trouvé' };
+      }
+      
+      // Tester l'API avec une requête simple
+      const response = await jobAPI.getEmployerJobs();
+      console.log('Test API réussi:', response.status);
+      return { success: true };
+    } catch (error) {
+      console.error('Test API échoué:', error);
+      return { 
+        success: false, 
+        message: error.response?.data?.message || 'Erreur de connexion à l\'API' 
+      };
+    }
+  };
+
+  // Fonction pour supprimer une compétence de la liste
+  const handleRemoveSkill = (skill, values, setFieldValue) => {
+    setFieldValue('requiredSkills', values.requiredSkills.filter(s => s !== skill));
+  };
+
+  // Fonction pour ajouter un avantage à la liste
+  const handleAddBenefit = (values, setFieldValue) => {
+    if (values.newBenefit && !values.benefits.includes(values.newBenefit)) {
+      setFieldValue('benefits', [...values.benefits, values.newBenefit]);
+      setFieldValue('newBenefit', '');
+    }
+  };
+
+  // Fonction pour supprimer un avantage de la liste
+  const handleRemoveBenefit = (benefit, values, setFieldValue) => {
+    setFieldValue('benefits', values.benefits.filter(b => b !== benefit));
+  };
+
+  // Fonction pour gérer les jours de travail
+  const handleWorkingDayChange = (day, values, setFieldValue) => {
+    const currentDays = [...values.workingDays];
+    if (currentDays.includes(day)) {
+      setFieldValue('workingDays', currentDays.filter(d => d !== day));
+    } else {
+      setFieldValue('workingDays', [...currentDays, day]);
+    }
+  };
+
+  return (
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Typography variant="h4" component="h1" gutterBottom>
+        Créer une nouvelle offre d'emploi
+      </Typography>
+      
+      {success && (
+        <Alert severity="success" sx={{ mb: 3 }}>
+          Offre d'emploi créée avec succès ! Vous allez être redirigé...
+        </Alert>
+      )}
+      
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      )}
+      
+      <Paper sx={{ p: 3 }}>
+        <Formik
+          initialValues={initialValues}
+          validationSchema={validationSchema}
+          onSubmit={handleSubmit}
+        >
+          {({ values, errors, touched, handleChange, handleBlur, isSubmitting, setFieldValue }) => (
+            <Form>
+              <Typography variant="h6" gutterBottom>
+                Informations générales
+              </Typography>
+              
+              <TextField
+                fullWidth
+                id="title"
+                name="title"
+                label="Titre de l'offre"
+                value={values.title}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                error={touched.title && Boolean(errors.title)}
+                helperText={touched.title && errors.title}
+                margin="normal"
+              />
+              
+              <TextField
+                fullWidth
+                id="description"
+                name="description"
+                label="Description"
+                multiline
+                rows={4}
+                value={values.description}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                error={touched.description && Boolean(errors.description)}
+                helperText={touched.description && errors.description}
+                margin="normal"
+              />
+              
+              <Box sx={{ display: 'flex', gap: 2, mb: 2, mt: 2 }}>
+                <FormControl fullWidth>
+                  <InputLabel id="contractType-label">Type de contrat</InputLabel>
+                  <Select
+                    labelId="contractType-label"
+                    id="contractType"
+                    name="contractType"
+                    value={values.contractType}
+                    onChange={handleChange}
+                    error={touched.contractType && Boolean(errors.contractType)}
+                  >
+                    {CONTRACT_TYPES.map((type) => (
+                      <MenuItem key={type} value={type}>{type}</MenuItem>
+                    ))}
+                  </Select>
+                  {touched.contractType && errors.contractType && (
+                    <FormHelperText error>{errors.contractType}</FormHelperText>
+                  )}
+                </FormControl>
+
+                <FormControl fullWidth>
+                  <InputLabel id="sector-label">Secteur d'activité</InputLabel>
+                  <Select
+                    labelId="sector-label"
+                    id="sector"
+                    name="sector"
+                    value={values.sector}
+                    onChange={handleChange}
+                    error={touched.sector && Boolean(errors.sector)}
+                  >
+                    {SECTORS.map((sector) => (
+                      <MenuItem key={sector} value={sector}>{sector}</MenuItem>
+                    ))}
+                  </Select>
+                  {touched.sector && errors.sector && (
+                    <FormHelperText error>{errors.sector}</FormHelperText>
+                  )}
+                </FormControl>
+              </Box>
+              
+              <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                <FormControl fullWidth>
+                  <InputLabel id="experienceLevel-label">Niveau d'expérience</InputLabel>
+                  <Select
+                    labelId="experienceLevel-label"
+                    id="experienceLevel"
+                    name="experienceLevel"
+                    value={values.experienceLevel}
+                    onChange={handleChange}
+                    error={touched.experienceLevel && Boolean(errors.experienceLevel)}
+                  >
+                    {EXPERIENCE_LEVELS.map((level) => (
+                      <MenuItem key={level} value={level}>{level}</MenuItem>
+                    ))}
+                  </Select>
+                  {touched.experienceLevel && errors.experienceLevel && (
+                    <FormHelperText error>{errors.experienceLevel}</FormHelperText>
+                  )}
+                </FormControl>
+
+                <FormControl fullWidth>
+                  <InputLabel id="educationLevel-label">Niveau d'éducation</InputLabel>
+                  <Select
+                    labelId="educationLevel-label"
+                    id="educationLevel"
+                    name="educationLevel"
+                    value={values.educationLevel}
+                    onChange={handleChange}
+                  >
+                    <MenuItem value="">Non spécifié</MenuItem>
+                    {EDUCATION_LEVELS.map((level) => (
+                      <MenuItem key={level} value={level}>{level}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
+              
+              <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
+                Localisation
+              </Typography>
+              
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    fullWidth
+                    id="location.city"
+                    name="location.city"
+                    label="Ville"
+                    value={values.location.city}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    error={touched.location?.city && Boolean(errors.location?.city)}
+                    helperText={touched.location?.city && errors.location?.city}
+                    margin="normal"
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    fullWidth
+                    id="location.address"
+                    name="location.address"
+                    label="Adresse"
+                    value={values.location.address}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    margin="normal"
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    fullWidth
+                    id="location.region"
+                    name="location.region"
+                    label="Région"
+                    value={values.location.region}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    margin="normal"
+                  />
+                </Grid>
+              </Grid>
+              
+              <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
+                Salaire
+              </Typography>
+              
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    fullWidth
+                    id="salary.amount"
+                    name="salary.amount"
+                    label="Montant"
+                    type="number"
+                    value={values.salary.amount}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    error={touched.salary?.amount && Boolean(errors.salary?.amount)}
+                    helperText={touched.salary?.amount && errors.salary?.amount}
+                    margin="normal"
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <FormControl fullWidth margin="normal">
+                    <InputLabel id="salary.period-label">Période</InputLabel>
+                    <Select
+                      labelId="salary.period-label"
+                      id="salary.period"
+                      name="salary.period"
+                      value={values.salary.period}
+                      onChange={handleChange}
+                      error={touched.salary?.period && Boolean(errors.salary?.period)}
+                    >
+                      {SALARY_PERIODS.map((period) => (
+                        <MenuItem key={period} value={period}>{period}</MenuItem>
+                      ))}
+                    </Select>
+                    {touched.salary?.period && errors.salary?.period && (
+                      <FormHelperText error>{errors.salary?.period}</FormHelperText>
+                    )}
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    fullWidth
+                    id="salary.currency"
+                    name="salary.currency"
+                    label="Devise"
+                    value={values.salary.currency}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    margin="normal"
+                    disabled
+                  />
+                </Grid>
+              </Grid>
+              
+              <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
+                Compétences requises
+              </Typography>
+              
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <TextField
+                  fullWidth
+                  id="newSkill"
+                  name="newSkill"
+                  label="Ajouter une compétence"
+                  value={values.newSkill}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  margin="normal"
+                  sx={{ mr: 1 }}
+                />
+                <Button 
+                  variant="contained" 
+                  onClick={() => handleAddSkill(values, setFieldValue)}
+                  disabled={!values.newSkill}
+                >
+                  Ajouter
+                </Button>
+              </Box>
+              
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}>
+                {values.requiredSkills.map((skill, index) => (
+                  <Chip
+                    key={index}
+                    label={skill}
+                    onDelete={() => handleRemoveSkill(skill, values, setFieldValue)}
+                    color="primary"
+                    variant="outlined"
+                  />
+                ))}
+              </Box>
+              {touched.requiredSkills && errors.requiredSkills && (
+                <FormHelperText error>{errors.requiredSkills}</FormHelperText>
+              )}
+              
+
+              
+              <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
+                Dates importantes
+              </Typography>
+              
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    fullWidth
+                    id="startDate"
+                    name="startDate"
+                    label="Date de début"
+                    type="date"
+                    value={values.startDate}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    error={touched.startDate && Boolean(errors.startDate)}
+                    helperText={touched.startDate && errors.startDate}
+                    margin="normal"
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    fullWidth
+                    id="endDate"
+                    name="endDate"
+                    label="Date de fin (optionnel)"
+                    type="date"
+                    value={values.endDate}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    error={touched.endDate && Boolean(errors.endDate)}
+                    helperText={touched.endDate && errors.endDate}
+                    margin="normal"
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    fullWidth
+                    id="applicationDeadline"
+                    name="applicationDeadline"
+                    label="Date limite de candidature"
+                    type="date"
+                    value={values.applicationDeadline}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    error={touched.applicationDeadline && Boolean(errors.applicationDeadline)}
+                    helperText={touched.applicationDeadline && errors.applicationDeadline}
+                    margin="normal"
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+              </Grid>
+              
+              <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
+                Horaires de travail
+              </Typography>
+              
+              <Box sx={{ mb: 3 }}>
+                <FormGroup row>
+                  {WORKING_DAYS.map((day) => (
+                    <FormControlLabel
+                      key={day}
+                      control={
+                        <Checkbox
+                          checked={values.workingDays.includes(day)}
+                          onChange={() => handleWorkingDayChange(day, values, setFieldValue)}
+                          name={`workingDays-${day}`}
+                        />
+                      }
+                      label={day}
+                    />
+                  ))}
+                </FormGroup>
+                {touched.workingDays && errors.workingDays && (
+                  <FormHelperText error>{errors.workingDays}</FormHelperText>
+                )}
+              </Box>
+              
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    id="workingHours.start"
+                    name="workingHours.start"
+                    label="Heure de début"
+                    type="time"
+                    value={values.workingHours.start}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    error={touched.workingHours?.start && Boolean(errors.workingHours?.start)}
+                    helperText={touched.workingHours?.start && errors.workingHours?.start}
+                    margin="normal"
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    id="workingHours.end"
+                    name="workingHours.end"
+                    label="Heure de fin"
+                    type="time"
+                    value={values.workingHours.end}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    error={touched.workingHours?.end && Boolean(errors.workingHours?.end)}
+                    helperText={touched.workingHours?.end && errors.workingHours?.end}
+                    margin="normal"
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+              </Grid>
+              
+              <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
+                Informations supplémentaires
+              </Typography>
+              
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    id="numberOfPositions"
+                    name="numberOfPositions"
+                    label="Nombre de postes à pourvoir"
+                    type="number"
+                    value={values.numberOfPositions}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    error={touched.numberOfPositions && Boolean(errors.numberOfPositions)}
+                    helperText={touched.numberOfPositions && errors.numberOfPositions}
+                    margin="normal"
+                    InputProps={{ inputProps: { min: 1 } }}
+                  />
+                </Grid>
+              </Grid>
+              
+              <Typography variant="subtitle1" gutterBottom sx={{ mt: 2 }}>
+                Avantages proposés (optionnel)
+              </Typography>
+              
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <TextField
+                  fullWidth
+                  id="newBenefit"
+                  name="newBenefit"
+                  label="Ajouter un avantage"
+                  value={values.newBenefit}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  margin="normal"
+                  sx={{ mr: 1 }}
+                />
+                <Button 
+                  variant="contained" 
+                  onClick={() => handleAddBenefit(values, setFieldValue)}
+                  disabled={!values.newBenefit}
+                >
+                  Ajouter
+                </Button>
+              </Box>
+              
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}>
+                {values.benefits.map((benefit, index) => (
+                  <Chip
+                    key={index}
+                    label={benefit}
+                    onDelete={() => handleRemoveBenefit(benefit, values, setFieldValue)}
+                    color="secondary"
+                    variant="outlined"
+                  />
+                ))}
+              </Box>
+              
+              <Divider sx={{ my: 4 }} />
+              
+              <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
+                  <Button
+                    type="button"
+                    variant="outlined"
+                    color="secondary"
+                    onClick={() => resetForm()}
+                    disabled={isSubmitting}
+                  >
+                    Réinitialiser
+                  </Button>
+                  
+                  <Box>
+                    <Button
+                      type="button"
+                      variant="outlined"
+                      color="primary"
+                      onClick={() => {
+                        // Créer un jeu de données simplifié pour le test
+                        const debugData = {
+                          title: 'Serveur(se) en restauration',
+                          description: 'Nous recherchons un serveur expérimenté pour notre restaurant',
+                          contractType: 'CDI',
+                          sector: 'Restauration',
+                          experienceLevel: 'Débutant',
+                          location: {
+                            city: 'Casablanca',
+                            address: '123 Avenue Mohammed V'
+                          },
+                          salary: {
+                            amount: 5000,
+                            period: 'Mois',
+                            currency: 'MAD'
+                          },
+                          startDate: new Date().toISOString(),
+                          requiredSkills: ['Service client'],
+                          workingDays: ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi']
+                        };
+                        
+                        // Affichage des données pour débogage
+                        console.log('Données simplifiées pour test:', JSON.stringify(debugData, null, 2));
+                        
+                        console.log('Données de débogage:', debugData);
+                        
+                        // Récupérer le token d'authentification
+                        const token = localStorage.getItem('token');
+                        if (!token) {
+                          toast.error('Vous n\'êtes pas connecté. Veuillez vous connecter pour tester.');
+                          return;
+                        }
+                        
+                        // Tester d'abord l'authentification
+                        console.log('Test du token d\'authentification...');
+                        fetch('http://localhost:5001/api/auth/me', {
+                          method: 'GET',
+                          headers: {
+                            'Authorization': `Bearer ${token}`
+                          }
+                        })
+                        .then(response => response.json())
+                        .then(userData => {
+                          console.log('Données utilisateur:', userData);
+                          
+                          if (!userData.success) {
+                            toast.error('Problème d\'authentification: ' + (userData.message || 'Token invalide'));
+                            return;
+                          }
+                          
+                          // Vérifier le type d'utilisateur
+                          if (userData.data && userData.data.userType !== 'etablissement') {
+                            toast.error(`Votre compte est de type ${userData.data.userType}. Seuls les établissements peuvent créer des offres.`);
+                            return;
+                          }
+                          
+                          toast.info('Authentification réussie, envoi de l\'offre...');
+                          
+                          // Envoi direct via fetch pour éviter les problèmes potentiels avec axios
+                          // Utilisation de l'URL de l'API correcte
+                          fetch('http://localhost:5001/api/jobs', {
+                            // Si l'URL ci-dessus ne fonctionne pas, essayez celle-ci :
+                            // fetch('http://localhost:10000/api/jobs', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              'Authorization': `Bearer ${token}`
+                            },
+                            body: JSON.stringify(debugData)
+                          })
+                          .then(response => {
+                            console.log('Statut de la réponse:', response.status);
+                            console.log('Headers de la réponse:', Object.fromEntries([...response.headers]));
+                            
+                            // Si la réponse n'est pas ok, on la traite quand même pour voir l'erreur
+                            return response.text().then(text => {
+                              try {
+                                // Essayer de parser en JSON
+                                return { status: response.status, data: JSON.parse(text) };
+                              } catch (e) {
+                                // Si ce n'est pas du JSON, retourner le texte brut
+                                return { status: response.status, data: text };
+                              }
+                            });
+                          })
+                          .then(({ status, data }) => {
+                            console.log(`Réponse du serveur (${status}):`, data);
+                            
+                            if (status === 201 || status === 200) {
+                              toast.success('Test réussi: Offre créée avec succès!');
+                            } else {
+                              // Afficher les détails de l'erreur
+                              const errorMessage = data.message || data.error || (typeof data === 'string' ? data : 'Erreur inconnue');
+                              toast.error(`Test échoué (${status}): ${errorMessage}`);
+                              
+                              // Afficher les détails de validation si disponibles
+                              if (data.errors) {
+                                console.error('Erreurs de validation:', data.errors);
+                                Object.entries(data.errors).forEach(([field, message]) => {
+                                  toast.error(`Erreur de validation: ${field} - ${message}`);
+                                });
+                              }
+                            }
+                          })
+                          .catch(error => {
+                            console.error('Erreur lors du test:', error);
+                            toast.error(`Erreur lors du test: ${error.message}`);
+                          });
+                        });
+                      }}
+                      sx={{ mr: 2 }}
+                      disabled={isSubmitting}
+                    >
+                      Tester l'insertion
+                    </Button>
+                    
+                    <Button
+                      type="submit"
+                      variant="contained"
+                      color="primary"
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? 'Publication en cours...' : 'Publier l\'offre'}
+                    </Button>
+                  </Box>
+                </Box>
+              </Box>
+            </Form>
+          )}
+        </Formik>
+      </Paper>
+    </Container>
+  );
+};
+
+export default CreateJobPage;

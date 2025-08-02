@@ -1,0 +1,894 @@
+import React, { useState, useEffect } from 'react';
+import SEO from '../components/seo/SEO';
+import { useAuth } from '../contexts/AuthContext';
+import { Link } from 'react-router-dom';
+import { extractDataFromResponse, jobsAPI } from '../utils/api';
+import {
+  Box,
+  Button,
+  Container,
+  Grid,
+  Typography,
+  Card,
+  CardContent,
+  CardActions,
+  CardMedia,
+  Chip,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Pagination,
+  CircularProgress,
+  Divider,
+  InputAdornment,
+  Paper,
+  useTheme,
+  alpha,
+  Avatar,
+  Skeleton,
+  Tooltip,
+  Badge,
+  IconButton,
+} from '@mui/material';
+import SearchIcon from '@mui/icons-material/Search';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
+import WorkIcon from '@mui/icons-material/Work';
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import FilterAltIcon from '@mui/icons-material/FilterAlt';
+import BusinessIcon from '@mui/icons-material/Business';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
+import BookmarkIcon from '@mui/icons-material/Bookmark';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+
+const JobsPage = () => {
+  const theme = useTheme();
+  const [jobs, setJobs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  
+  // Ajout du composant SEO pour le référencement
+  const seoTitle = "Offres d'emploi dans la restauration et l'hôtellerie au Maroc | FoodForce";
+  const seoDescription = "Découvrez les meilleures offres d'emploi dans la restauration, l'hôtellerie et l'événementiel au Maroc. Postulez en ligne et trouvez votre prochain emploi avec FoodForce.";
+  const seoKeywords = "offres emploi restauration maroc, jobs hôtellerie, recrutement chef cuisinier, emploi serveur maroc, travail barman casablanca, emploi réceptionniste maroc";
+  const [savedJobs, setSavedJobs] = useState([]);
+  const [filters, setFilters] = useState({
+    search: '',
+    sector: '',
+    contractType: '',
+    city: '',
+  });
+
+  // Charger les offres d'emploi au chargement de la page et lors des changements de filtres
+  useEffect(() => {
+    const fetchJobs = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        // Construire les paramètres de requête en fonction des filtres
+        const params = {};
+        
+        // Ajouter le statut actif par défaut
+        params.status = 'active';
+        
+        // Ajouter les filtres sélectionnés s'ils existent
+        if (filters.sector) params.sector = filters.sector;
+        if (filters.contractType) params.contractType = filters.contractType;
+        if (filters.city) params['location.city'] = filters.city;
+        if (filters.search.trim() !== '') params.search = filters.search.trim();
+        
+        // Nous ne filtrons pas par employeur pour récupérer toutes les offres
+        // Les offres de Lunatech seront identifiées par leur ID d'employeur plus tard
+        
+        console.log('Paramètres de la requête:', params);
+        
+        // Récupérer toutes les offres actives via l'API
+        const jobsResponse = await jobsAPI.getJobs(params);
+        console.log('Réponse API complète:', jobsResponse);
+        
+        // Extraire les offres d'emploi
+        let jobsData = [];
+        if (jobsResponse && jobsResponse.data && jobsResponse.data.success === true && Array.isArray(jobsResponse.data.data)) {
+          jobsData = jobsResponse.data.data;
+          console.log(`${jobsData.length} offres trouvées au total`);
+        } else {
+          console.log('Aucune offre trouvée ou format de réponse incorrect');
+        }
+        
+        // Traitement des offres pour l'affichage
+        const processedJobs = jobsData.map(job => {
+          console.log('Traitement de l\'offre:', job);
+          
+          // Créer un objet de base avec des valeurs par défaut
+          const processedJob = {
+            id: job._id,
+            title: job.title || 'Poste non spécifié',
+            company: 'Entreprise non spécifiée', // Valeur par défaut
+            logo: '', // Valeur par défaut
+            location: job.location && job.location.city ? job.location.city : 'Lieu non spécifié',
+            contractType: job.contractType || 'Type de contrat non spécifié',
+            sector: job.sector || 'Secteur non spécifié',
+            date: job.createdAt ? new Date(job.createdAt) : new Date(),
+            description: job.description || 'Aucune description disponible',
+            isActive: job.isActive !== undefined ? job.isActive : true,
+            status: job.status || 'active',
+            applicationDeadline: job.applicationDeadline ? new Date(job.applicationDeadline) : null,
+            experienceLevel: job.experienceLevel || 'Non spécifié',
+            workingDays: job.workingDays || [],
+            benefits: job.benefits || [],
+            numberOfPositions: job.numberOfPositions || 1,
+            startDate: job.startDate ? (typeof job.startDate === 'string' ? new Date(job.startDate) : job.startDate) : null
+          };
+          
+          // Traitement du salaire
+          if (job.salary && job.salary.amount && job.salary.currency && job.salary.period) {
+            processedJob.salary = `${job.salary.amount} ${job.salary.currency}/${job.salary.period}`;
+          } else {
+            processedJob.salary = 'Salaire non spécifié';
+          }
+          
+          // Traitement des horaires de travail
+          if (job.workingHours && job.workingHours.start && job.workingHours.end) {
+            processedJob.workingHours = job.workingHours;
+          } else {
+            processedJob.workingHours = { start: '09:00', end: '17:00' };
+          }
+          
+          // Traitement des informations de l'employeur
+          if (job.employer) {
+            // Cas spécial pour Lunatech
+            if (job.employer._id === '683dafd914c89e8af1e547dd') {
+              processedJob.company = 'Lunatech Maroc';
+              processedJob.logo = '/images/lunatech-logo.png';
+              console.log('Offre Lunatech détectée:', processedJob.title);
+            } 
+            // Si l'employeur a un nom, l'utiliser
+            else if (job.employer.name) {
+              processedJob.company = job.employer.name;
+              // Si l'employeur a un logo, l'utiliser
+              if (job.employer.logo) {
+                processedJob.logo = job.employer.logo;
+              } else {
+                processedJob.logo = '/images/default-company-logo.png';
+              }
+            }
+          }
+          
+          return processedJob;
+        });
+        
+        // Ajouter des offres manuelles pour le test si nécessaire
+        if (processedJobs.length === 0) {
+          console.log('Aucune offre trouvée, ajout d\'offres de test');
+          processedJobs.push({
+            id: 'test-job-1',
+            title: 'Chef de cuisine',
+            company: 'Restaurant Le Gourmet',
+            logo: '/images/lunatech-logo.png',
+            location: 'Casablanca',
+            salary: '15000 MAD/Mois',
+            contractType: 'CDI',
+            sector: 'Restauration',
+            date: new Date(),
+            description: 'Nous recherchons un chef de cuisine expérimenté',
+            isActive: true,
+            status: 'active',
+            applicationDeadline: new Date(new Date().setMonth(new Date().getMonth() + 1)),
+            experienceLevel: 'Expérimenté',
+            workingHours: { start: '09:00', end: '18:00' },
+            workingDays: ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi'],
+            benefits: [],
+            numberOfPositions: 1,
+            startDate: new Date()
+          });
+          
+          // Ajouter une deuxième offre de test
+          processedJobs.push({
+            id: 'test-job-2',
+            title: 'Serveur de restaurant',
+            company: 'Café Parisien',
+            logo: '/images/lunatech-logo.png',
+            location: 'Rabat',
+            salary: '8000 MAD/Mois',
+            contractType: 'CDD',
+            sector: 'Restauration',
+            date: new Date(),
+            description: 'Nous recherchons un serveur expérimenté pour notre café',
+            isActive: true,
+            status: 'active',
+            applicationDeadline: new Date(new Date().setMonth(new Date().getMonth() + 1)),
+            experienceLevel: 'Débutant',
+            workingHours: { start: '10:00', end: '19:00' },
+            workingDays: ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'],
+            benefits: [],
+            numberOfPositions: 2,
+            startDate: new Date()
+          });
+        }
+        
+        // Mettre à jour le state avec les offres traitées
+        setJobs(processedJobs);
+        console.log('Offres chargées:', processedJobs.length);
+        console.log('Détail des offres traitées:', processedJobs);
+        
+        // Gérer la pagination
+        if (jobsResponse && jobsResponse.data && jobsResponse.data.count) {
+          const totalCount = jobsResponse.data.count;
+          setTotalPages(Math.ceil(totalCount / 10));
+        } else {
+          setTotalPages(1);
+        }
+        
+        setLoading(false);
+      } catch (err) {
+        console.error('Erreur lors du chargement des offres:', err);
+        setError('Erreur lors du chargement des offres. Veuillez réessayer plus tard.');
+        setJobs([]);
+        setLoading(false);
+      }
+    };
+
+    fetchJobs();
+  }, [page, filters]);
+
+  // Gérer le changement de page
+  const handlePageChange = (event, value) => {
+    setPage(value);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Gérer les changements de filtres
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({ ...prev, [name]: value }));
+    setPage(1); // Réinitialiser la pagination lors du changement de filtres
+  };
+
+  // Réinitialiser les filtres
+  const handleResetFilters = () => {
+    setFilters({
+      search: '',
+      sector: '',
+      contractType: '',
+      city: '',
+    });
+    setPage(1);
+  };
+
+  // Gérer les offres sauvegardées
+  const toggleSaveJob = (jobId) => {
+    if (savedJobs.includes(jobId)) {
+      setSavedJobs(savedJobs.filter(id => id !== jobId));
+    } else {
+      setSavedJobs([...savedJobs, jobId]);
+    }
+    // Dans une application réelle, on sauvegarderait cela dans le localStorage ou en base de données
+    // localStorage.setItem('savedJobs', JSON.stringify(savedJobs));
+  };
+
+  // Vérifier si une offre est sauvegardée
+  const isJobSaved = (jobId) => {
+    return savedJobs.includes(jobId);
+  };
+
+  // Formater la date
+  const formatDate = (dateString) => {
+    const options = { year: 'numeric', month: 'long', day: 'numeric' };
+    return new Date(dateString).toLocaleDateString('fr-FR', options);
+  };
+
+  // Formater le salaire
+  const formatSalary = (salary) => {
+    if (!salary) return 'Non spécifié';
+    return `${salary.amount} ${salary.currency} / ${salary.period}`;
+  };
+  
+  // Obtenir la couleur du chip en fonction du type de contrat
+  const getContractTypeColor = (type) => {
+    switch(type) {
+      case 'CDI': return 'success';
+      case 'CDD': return 'primary';
+      case 'Intérim': return 'secondary';
+      case 'Extra': return 'warning';
+      default: return 'default';
+    }
+  };
+
+  return (
+    <Box sx={{ minHeight: '100vh', backgroundColor: alpha(theme.palette.background.default, 0.8) }}>
+      <SEO 
+        title={seoTitle}
+        description={seoDescription}
+        keywords={seoKeywords}
+        canonicalUrl="/jobs"
+      />
+      {/* En-tête avec fond en dégradé - plein écran */}
+      <Box
+        sx={{
+          background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+          color: 'white',
+          py: { xs: 10, md: 12 },
+          mt: -10, // Pour supprimer l'espace en haut
+          mb: 8,
+          position: 'relative',
+          overflow: 'hidden',
+          width: '100vw',
+          marginLeft: 'calc(-50vw + 50%)',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.1) 2px, transparent 2px)',
+            backgroundSize: '30px 30px',
+            opacity: 0.3,
+            zIndex: 1,
+          },
+          '&::after': {
+            content: '""',
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            width: '100%',
+            height: '30%',
+            background: 'linear-gradient(to top, rgba(0,0,0,0.2), transparent)',
+            zIndex: 1,
+          }
+        }}
+      >
+        <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 2 }}>
+          <Grid container spacing={4} alignItems="center">
+            <Grid item xs={12} md={8}>
+              <Typography
+                variant="h2"
+                component="h1"
+                fontWeight="bold"
+                gutterBottom
+                sx={{
+                  textShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                  position: 'relative',
+                  '&::after': {
+                    content: '""',
+                    display: 'block',
+                    width: '80px',
+                    height: '4px',
+                    backgroundColor: theme.palette.secondary.main,
+                    mt: 2,
+                    borderRadius: '2px',
+                  }
+                }}
+              >
+                Trouvez l'emploi idéal dans le secteur alimentaire
+              </Typography>
+              <Typography
+                variant="h6"
+                sx={{
+                  mb: 4,
+                  maxWidth: '800px',
+                  lineHeight: 1.6,
+                  opacity: 0.9,
+                }}
+              >
+                Découvrez les meilleures opportunités dans les secteurs de la restauration, hôtellerie, événementiel, vente et logistique au Maroc.
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                <Badge badgeContent={jobs.length} color="secondary" sx={{ '& .MuiBadge-badge': { fontSize: '0.9rem', fontWeight: 'bold' } }}>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    color="secondary"
+                    startIcon={<WorkIcon />}
+                    sx={{
+                      borderRadius: '30px',
+                      px: 3,
+                      py: 1.5,
+                      boxShadow: '0 4px 14px rgba(0,0,0,0.2)',
+                      transition: 'all 0.2s ease',
+                      '&:hover': {
+                        transform: 'translateY(-3px)',
+                        boxShadow: '0 6px 20px rgba(0,0,0,0.3)',
+                      }
+                    }}
+                  >
+                    Voir toutes les offres
+                  </Button>
+                </Badge>
+                <Button
+                  variant="outlined"
+                  size="large"
+                  color="inherit"
+                  startIcon={<BookmarkIcon />}
+                  sx={{
+                    borderRadius: '30px',
+                    px: 3,
+                    py: 1.5,
+                    borderColor: 'rgba(255,255,255,0.5)',
+                    '&:hover': {
+                      borderColor: 'white',
+                      backgroundColor: 'rgba(255,255,255,0.1)',
+                    }
+                  }}
+                >
+                  Offres sauvegardées
+                </Button>
+              </Box>
+            </Grid>
+            <Grid item xs={12} md={4} sx={{ display: { xs: 'none', md: 'block' } }}>
+              <Box
+                sx={{
+                  position: 'relative',
+                  height: '300px',
+                  width: '300px',
+                  margin: '0 auto',
+                  '&::before': {
+                    content: '""',
+                    position: 'absolute',
+                    top: '-20px',
+                    right: '-20px',
+                    width: '140px',
+                    height: '140px',
+                    borderRadius: '50%',
+                    backgroundColor: alpha(theme.palette.secondary.main, 0.2),
+                    zIndex: 1,
+                  },
+                  '&::after': {
+                    content: '""',
+                    position: 'absolute',
+                    bottom: '-30px',
+                    left: '-30px',
+                    width: '180px',
+                    height: '180px',
+                    borderRadius: '50%',
+                    backgroundColor: alpha(theme.palette.primary.light, 0.15),
+                    zIndex: 1,
+                  }
+                }}
+              >
+                {/* Ici on pourrait ajouter une illustration ou une image */}
+              </Box>
+            </Grid>
+          </Grid>
+        </Container>
+      </Box>
+
+      <Container maxWidth="lg" sx={{ mb: 8 }}>
+        {/* Filtres */}
+        <Paper
+          elevation={3}
+          sx={{
+            mb: 6,
+            p: 3,
+            borderRadius: 4,
+            backgroundColor: 'white',
+            position: 'relative',
+            top: '-30px',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.08)',
+            overflow: 'hidden',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '6px',
+              height: '100%',
+              backgroundColor: theme.palette.primary.main,
+            }
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+            <Avatar
+              sx={{
+                bgcolor: alpha(theme.palette.primary.main, 0.1),
+                color: theme.palette.primary.main,
+                mr: 2
+              }}
+            >
+              <FilterAltIcon />
+            </Avatar>
+            <Typography variant="h5" fontWeight="bold">
+              Filtres de recherche
+            </Typography>
+          </Box>
+          
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                name="search"
+                label="Rechercher par mot-clé"
+                value={filters.search}
+                onChange={handleFilterChange}
+                variant="outlined"
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon color="primary" />
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                      borderColor: theme.palette.primary.main,
+                    },
+                  }
+                }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <FormControl fullWidth variant="outlined">
+                <InputLabel id="sector-label">Secteur</InputLabel>
+                <Select
+                  labelId="sector-label"
+                  name="sector"
+                  value={filters.sector}
+                  label="Secteur"
+                  onChange={handleFilterChange}
+                  sx={{ borderRadius: 2 }}
+                  startAdornment={
+                    <InputAdornment position="start">
+                      <BusinessIcon color="primary" sx={{ ml: 1 }} />
+                    </InputAdornment>
+                  }
+                >
+                  <MenuItem value="">Tous les secteurs</MenuItem>
+                  <MenuItem value="Restauration">Restauration</MenuItem>
+                  <MenuItem value="Hôtellerie">Hôtellerie</MenuItem>
+                  <MenuItem value="Événementiel">Événementiel</MenuItem>
+                  <MenuItem value="Vente">Vente</MenuItem>
+                  <MenuItem value="Logistique">Logistique</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <FormControl fullWidth variant="outlined">
+                <InputLabel id="contract-type-label">Type de contrat</InputLabel>
+                <Select
+                  labelId="contract-type-label"
+                  name="contractType"
+                  value={filters.contractType}
+                  label="Type de contrat"
+                  onChange={handleFilterChange}
+                  sx={{ borderRadius: 2 }}
+                  startAdornment={
+                    <InputAdornment position="start">
+                      <AccessTimeIcon color="primary" sx={{ ml: 1 }} />
+                    </InputAdornment>
+                  }
+                >
+                  <MenuItem value="">Tous les contrats</MenuItem>
+                  <MenuItem value="CDI">CDI</MenuItem>
+                  <MenuItem value="CDD">CDD</MenuItem>
+                  <MenuItem value="Intérim">Intérim</MenuItem>
+                  <MenuItem value="Extra">Extra</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField
+                fullWidth
+                name="city"
+                label="Ville"
+                value={filters.city}
+                onChange={handleFilterChange}
+                variant="outlined"
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <LocationOnIcon color="primary" />
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                      borderColor: theme.palette.primary.main,
+                    },
+                  }
+                }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Button
+                variant="outlined"
+                color="secondary"
+                onClick={handleResetFilters}
+                fullWidth
+                sx={{
+                  height: '56px',
+                  borderRadius: 2,
+                  borderWidth: '2px',
+                  '&:hover': {
+                    borderWidth: '2px',
+                    backgroundColor: alpha(theme.palette.secondary.main, 0.1),
+                  }
+                }}
+                startIcon={<RestartAltIcon />}
+              >
+                Réinitialiser
+              </Button>
+            </Grid>
+          </Grid>
+        </Paper>
+
+      {/* Résultats */}
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+          <CircularProgress size={60} thickness={4} sx={{ color: theme.palette.secondary.main }} />
+        </Box>
+      ) : error ? (
+        <Paper elevation={2} sx={{ py: 6, px: 4, borderRadius: 4, textAlign: 'center', backgroundColor: alpha(theme.palette.error.main, 0.05) }}>
+          <Typography color="error" variant="h6" gutterBottom>
+            {error}
+          </Typography>
+          <Button variant="outlined" color="error" onClick={() => window.location.reload()} sx={{ mt: 2, borderRadius: 2 }}>
+            Réessayer
+          </Button>
+        </Paper>
+      ) : jobs.length === 0 ? (
+        <Paper elevation={2} sx={{ py: 6, px: 4, borderRadius: 4, textAlign: 'center', backgroundColor: alpha(theme.palette.warning.main, 0.05) }}>
+          <WarningAmberIcon sx={{ fontSize: 60, color: alpha(theme.palette.warning.main, 0.7), mb: 2 }} />
+          <Typography variant="h5" gutterBottom fontWeight="bold">
+            Aucune offre d'emploi trouvée
+          </Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+            Essayez de modifier vos critères de recherche pour trouver plus de résultats.
+          </Typography>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleResetFilters}
+            startIcon={<RestartAltIcon />}
+            sx={{ borderRadius: 30, px: 3 }}
+          >
+            Réinitialiser les filtres
+          </Button>
+        </Paper>
+      ) : (
+        <>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Typography
+              variant="h6"
+              sx={{
+                fontWeight: 'bold',
+                display: 'flex',
+                alignItems: 'center',
+                '&::before': {
+                  content: '""',
+                  display: 'inline-block',
+                  width: '12px',
+                  height: '12px',
+                  borderRadius: '50%',
+                  backgroundColor: theme.palette.primary.main,
+                  mr: 1.5,
+                }
+              }}
+            >
+              {jobs.length} offre(s) trouvée(s)
+            </Typography>
+            <Chip
+              label="Trier par date"
+              variant="outlined"
+              color="primary"
+              sx={{ borderRadius: 2, '&:hover': { backgroundColor: alpha(theme.palette.primary.main, 0.1) } }}
+              onClick={() => {/* Fonction de tri */}}
+            />
+          </Box>
+          
+          <Grid container spacing={3}>
+            {jobs.map((job) => (
+              <Grid item xs={12} key={job.id}>
+                <Card
+                  sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    height: '100%',
+                    borderRadius: 4,
+                    overflow: 'hidden',
+                    transition: 'transform 0.3s, box-shadow 0.3s',
+                    '&:hover': {
+                      transform: 'translateY(-8px)',
+                      boxShadow: '0 12px 20px rgba(0,0,0,0.1)',
+                    }
+                  }}
+                >
+                  <CardMedia
+                    component="div"
+                    sx={{
+                      height: 140,
+                      backgroundColor: theme.palette.primary.light,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      position: 'relative',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <Avatar
+                      src={job.logo || ''}
+                      alt={`Logo ${job.company}`}
+                      sx={{
+                        width: 80,
+                        height: 80,
+                        border: `3px solid ${theme.palette.background.paper}`,
+                        boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
+                        backgroundColor: theme.palette.secondary.main,
+                        color: theme.palette.secondary.contrastText,
+                        fontSize: '2rem',
+                      }}
+                    >
+                      {job.company ? job.company.charAt(0) : 'E'}
+                    </Avatar>
+                  </CardMedia>
+                  <CardContent sx={{ pt: 4, flex: 1 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', mb: 2 }}>
+                      <Box>
+                        <Typography variant="h5" component="h2" fontWeight="bold" gutterBottom>
+                          {job.title}
+                        </Typography>
+                        <Typography variant="subtitle1" color="text.secondary" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                          <BusinessIcon fontSize="small" sx={{ mr: 1, color: theme.palette.primary.main }} />
+                          {job.company || 'Entreprise non spécifiée'}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Chip
+                          label={job.contractType}
+                          color={getContractTypeColor(job.contractType)}
+                          size="medium"
+                          sx={{
+                            fontWeight: 'bold',
+                            borderRadius: '16px',
+                            px: 1,
+                          }}
+                        />
+                        <Tooltip title={isJobSaved(job.id) ? "Retirer des favoris" : "Ajouter aux favoris"}>
+                          <IconButton
+                            color="primary"
+                            onClick={() => toggleSaveJob(job.id)}
+                            sx={{
+                              transition: 'transform 0.2s',
+                              '&:hover': { transform: 'scale(1.1)' }
+                            }}
+                          >
+                            {isJobSaved(job.id) ? <BookmarkIcon /> : <BookmarkBorderIcon />}
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    </Box>
+
+                    <Divider sx={{ my: 2 }} />
+
+                    <Grid container spacing={2} sx={{ mb: 2 }}>
+                      <Grid item xs={12} sm={6} md={3}>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <Avatar sx={{ bgcolor: alpha(theme.palette.primary.main, 0.1), mr: 1.5, width: 32, height: 32 }}>
+                            <LocationOnIcon fontSize="small" color="primary" />
+                          </Avatar>
+                          <Typography variant="body2" fontWeight="medium">
+                            {job.location?.city || 'Non spécifié'}
+                          </Typography>
+                        </Box>
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={3}>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <Avatar sx={{ bgcolor: alpha(theme.palette.secondary.main, 0.1), mr: 1.5, width: 32, height: 32 }}>
+                            <WorkIcon fontSize="small" color="secondary" />
+                          </Avatar>
+                          <Typography variant="body2" fontWeight="medium">
+                            {job.sector}
+                          </Typography>
+                        </Box>
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={3}>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <Avatar sx={{ bgcolor: alpha(theme.palette.success.main, 0.1), mr: 1.5, width: 32, height: 32 }}>
+                            <AttachMoneyIcon fontSize="small" sx={{ color: theme.palette.success.main }} />
+                          </Avatar>
+                          <Typography variant="body2" fontWeight="medium">
+                            {job.salary || 'Salaire non spécifié'}
+                          </Typography>
+                        </Box>
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={3}>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <Avatar sx={{ bgcolor: alpha(theme.palette.info.main, 0.1), mr: 1.5, width: 32, height: 32 }}>
+                            <CalendarTodayIcon fontSize="small" sx={{ color: theme.palette.info.main }} />
+                          </Avatar>
+                          <Typography variant="body2" fontWeight="medium">
+                            Début: {job.startDate ? (typeof job.startDate === 'string' ? new Date(job.startDate).toLocaleDateString('fr-FR') : job.startDate.toLocaleDateString('fr-FR')) : 'Non spécifié'}
+                          </Typography>
+                        </Box>
+                      </Grid>
+                    </Grid>
+
+                    <Typography variant="body1" sx={{ mt: 2, color: alpha(theme.palette.text.primary, 0.8), lineHeight: 1.6 }}>
+                      {job.description?.substring(0, 200)}...
+                    </Typography>
+                  </CardContent>
+                  <CardActions sx={{ justifyContent: 'flex-end', p: 3, pt: 0, gap: 1 }}>
+                    <Button
+                      component={Link}
+                      to={`/jobs/${job._id}`}
+                      variant="contained"
+                      color="primary"
+                      endIcon={<i className="fas fa-arrow-right" />}
+                      sx={{
+                        borderRadius: '30px',
+                        px: 3,
+                        py: 1,
+                        fontWeight: 'bold',
+                        boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
+                        transition: 'all 0.2s',
+                        '&:hover': {
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 6px 15px rgba(0,0,0,0.15)',
+                        }
+                      }}
+                    >
+                      Voir les détails
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      color="primary"
+                      sx={{
+                        borderRadius: '30px',
+                        px: 2,
+                        '&:hover': {
+                          backgroundColor: alpha(theme.palette.primary.main, 0.05),
+                        }
+                      }}
+                    >
+                      Postuler
+                    </Button>
+                  </CardActions>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 6, mb: 2 }}>
+              <Pagination
+                count={totalPages}
+                page={page}
+                onChange={handlePageChange}
+                color="primary"
+                size="large"
+                shape="rounded"
+                showFirstButton
+                showLastButton
+                sx={{
+                  '& .MuiPaginationItem-root': {
+                    borderRadius: 2,
+                    mx: 0.5,
+                    '&.Mui-selected': {
+                      fontWeight: 'bold',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                    }
+                  }
+                }}
+              />
+            </Box>
+          )}
+        </>
+      )}
+      </Container>
+    </Box>
+  );
+};
+
+export default JobsPage;
