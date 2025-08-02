@@ -34,7 +34,6 @@ import NotificationsIcon from '@mui/icons-material/Notifications';
 import StarIcon from '@mui/icons-material/Star';
 import PaymentIcon from '@mui/icons-material/Payment';
 import NotificationBadge from '../notifications/NotificationBadge';
-import MessageBadge from '../messages/MessageBadge';
 
 const Header = () => {
   const { user, logout } = useAuth();
@@ -144,16 +143,7 @@ const Header = () => {
               OUTILS
             </Typography>
             <Box sx={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', px: 1 }}>
-              <Button
-                component={Link}
-                to="/messages"
-                startIcon={<EmailIcon />}
-                size="small"
-                sx={{ m: 0.5, borderRadius: 4 }}
-                variant="outlined"
-              >
-                Messages
-              </Button>
+
               <Button
                 component={Link}
                 to="/notifications"
@@ -380,11 +370,10 @@ const Header = () => {
             )}
           </Box>
 
-          {/* Badges de notification et message */}
+          {/* Badge de notification */}
           {isAuthenticated && (
             <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
               <NotificationBadge />
-              <MessageBadge />
             </Box>
           )}
 

@@ -18,13 +18,17 @@ const JobSchema = new mongoose.Schema({
   },
   contractType: {
     type: String,
-    enum: ['Permanent', 'Temporaire', 'Intérim', 'Extra', 'Saisonnier', 'Stage'],
+    enum: ['CDD', 'Intérim', 'Extra', 'Saisonnier', 'Stage'],
     required: [true, 'Veuillez spécifier le type de contrat']
   },
   sector: {
     type: String,
-    enum: ['Restauration', 'Hôtellerie', 'Événementiel', 'Vente', 'Logistique'],
+    enum: ['Bar', 'Restaurant', 'Restaurant collectif'],
     required: [true, 'Veuillez spécifier le secteur d\'activité']
+  },
+  servesAlcohol: {
+    type: Boolean,
+    default: false
   },
   location: {
     address: String,

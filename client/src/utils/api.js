@@ -318,63 +318,28 @@ export const applicationsAPI = {
   }
 };
 
-// Fonctions API pour les messages
+// Fonctions API pour les messages - DÉSACTIVÉ
 export const messagesAPI = {
-  sendMessage(receiverId, messageData) {
-    return api.post(`/messages/${receiverId}`, messageData);
+  // API de messagerie désactivée
+  sendMessage() {
+    console.warn('La messagerie a été désactivée');
+    return Promise.resolve({ success: false, message: 'La messagerie a été désactivée' });
   },
   getConversations() {
-    return api.get('/messages/conversations');
+    console.warn('La messagerie a été désactivée');
+    return Promise.resolve({ success: false, message: 'La messagerie a été désactivée', data: [] });
   },
-  getMessages(userId) {
-    return api.get(`/messages/${userId}`);
+  getMessages() {
+    console.warn('La messagerie a été désactivée');
+    return Promise.resolve({ success: false, message: 'La messagerie a été désactivée', data: [] });
   },
-  markAsRead(messageId) {
-    return api.put(`/messages/${messageId}/read`);
+  markAsRead() {
+    console.warn('La messagerie a été désactivée');
+    return Promise.resolve({ success: false, message: 'La messagerie a été désactivée' });
   },
   async getUnreadCount() {
-    try {
-      // Déterminer l'URL en fonction de l'environnement
-      const isProduction = process.env.NODE_ENV === 'production';
-      let baseUrl;
-      if (isProduction) {
-        baseUrl = 'https://food-force-api.onrender.com';
-      } else {
-        baseUrl = window.location.origin;
-      }
-      
-      const url = new URL('/api/messages/unread/count', baseUrl);
-      console.log('URL de récupération des messages non lus:', url.toString());
-      
-      // Ajouter le token d'authentification
-      const token = localStorage.getItem('token');
-      const headers = {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      };
-      
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      
-      // Effectuer la requête avec fetch
-      const response = await fetch(url.toString(), {
-        method: 'GET',
-        headers: headers
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Erreur HTTP: ${response.status} - ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      console.log('Réponse messages non lus:', data);
-      
-      return data;
-    } catch (err) {
-      console.error('Erreur lors de la récupération des messages non lus:', err);
-      throw err;
-    }
+    console.warn('La messagerie a été désactivée');
+    return { count: 0 };
   }
 };
 

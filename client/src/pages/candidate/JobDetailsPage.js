@@ -50,7 +50,6 @@ const JobDetailsPage = () => {
   const [error, setError] = useState(null);
   const [applying, setApplying] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
-  const [coverLetter, setCoverLetter] = useState('');
   const [hasApplied, setHasApplied] = useState(false);
   const [applicationStatus, setApplicationStatus] = useState(null);
 
@@ -150,8 +149,7 @@ const JobDetailsPage = () => {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          job: id,
-          coverLetter: coverLetter
+          job: id
         })
       });
       
@@ -164,30 +162,7 @@ const JobDetailsPage = () => {
       const data = await response.json();
       console.log('Réponse API candidature:', data);
       
-      // Envoyer une notification à l'établissement
-      try {
-        const notificationUrl = new URL('/api/notifications', baseUrl);
-        const employerId = job.employer?._id;
-        
-        if (employerId) {
-          console.log('Envoi d\'une notification à l\'employeur:', employerId);
-          
-          await fetch(notificationUrl.toString(), {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({
-              recipient: employerId,
-              type: 'new_application',
-              content: `Nouvelle candidature reçue pour l'offre: ${job.title}`,
-              relatedResource: id
-            })
-          });
-          console.log('Notification envoyée à l\'employeur');
-        }
-      } catch (notifErr) {
-        console.error('Erreur lors de l\'envoi de la notification à l\'employeur:', notifErr);
-        // Ne pas bloquer le processus si l'envoi de notification échoue
-      }
+      // Notification automatique gérée par le backend
       
       toast.success('Votre candidature a été envoyée avec succès!');
       setHasApplied(true);
@@ -428,70 +403,9 @@ const JobDetailsPage = () => {
           </Paper>
         </Grid>
         
-        {/* Informations sur l'employeur */}
+        {/* Informations supplémentaires */}
         <Grid item xs={12} md={4}>
           <Paper sx={{ p: 3, borderRadius: 2 }}>
-            <Typography variant="h6" gutterBottom fontWeight="bold">
-              À propos de l'employeur
-            </Typography>
-            
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <Avatar 
-                src={job.employer?.establishmentProfile?.logo} 
-                alt={job.employer?.establishmentProfile?.name} 
-                sx={{ width: 60, height: 60, mr: 2 }}
-              >
-                <BusinessIcon fontSize="large" />
-              </Avatar>
-              <Box>
-                <Typography variant="h6">
-                  {job.employer?.establishmentProfile?.name || 'Nom non spécifié'}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {job.employer?.establishmentProfile?.sector || 'Secteur non spécifié'}
-                </Typography>
-              </Box>
-            </Box>
-            
-            <Divider sx={{ my: 2 }} />
-            
-            <List dense>
-              <ListItem>
-                <ListItemIcon><LocationOnIcon color="primary" /></ListItemIcon>
-                <ListItemText 
-                  primary="Adresse" 
-                  secondary={`${job.employer?.address?.street || ''}, ${job.employer?.address?.city || 'Non spécifié'}`} 
-                />
-              </ListItem>
-              <ListItem>
-                <ListItemIcon><BusinessIcon color="primary" /></ListItemIcon>
-                <ListItemText 
-                  primary="Taille de l'entreprise" 
-                  secondary={job.employer?.establishmentProfile?.companySize || 'Non spécifié'} 
-                />
-              </ListItem>
-              <ListItem>
-                <ListItemIcon><CalendarTodayIcon color="primary" /></ListItemIcon>
-                <ListItemText 
-                  primary="Année de fondation" 
-                  secondary={job.employer?.establishmentProfile?.foundedYear || 'Non spécifié'} 
-                />
-              </ListItem>
-            </List>
-            
-            <Button
-              component={Link}
-              to={`/establishments/${job.employer?._id}`}
-              variant="outlined"
-              color="primary"
-              fullWidth
-              sx={{ mt: 2 }}
-            >
-              Voir le profil complet
-            </Button>
-          </Paper>
-          
-          <Paper sx={{ p: 3, borderRadius: 2, mt: 3 }}>
             <Typography variant="h6" gutterBottom fontWeight="bold">
               Informations supplémentaires
             </Typography>
@@ -510,43 +424,32 @@ const JobDetailsPage = () => {
                   secondary={job.numberOfPositions || '1'} 
                 />
               </ListItem>
+              <ListItem>
+                <ListItemIcon><BusinessIcon color="primary" /></ListItemIcon>
+                <ListItemText 
+                  primary="Secteur d'activité" 
+                  secondary={job.sector || 'Non spécifié'} 
+                />
+              </ListItem>
             </List>
           </Paper>
         </Grid>
       </Grid>
       
       {/* Dialogue de candidature */}
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
-        <DialogTitle>Postuler à l'offre: {job.title}</DialogTitle>
+      <Dialog open={openDialog} onClose={handleCloseDialog}>
+        <DialogTitle>Postuler à cette offre</DialogTitle>
         <DialogContent>
-          <DialogContentText sx={{ mb: 2 }}>
-            Veuillez rédiger une lettre de motivation pour accompagner votre candidature.
+          <DialogContentText>
+            Vous êtes sur le point de postuler à l'offre "{job?.title}". Confirmez-vous votre candidature ?
           </DialogContentText>
-          <TextField
-            autoFocus
-            margin="dense"
-            id="coverLetter"
-            label="Lettre de motivation"
-            type="text"
-            fullWidth
-            multiline
-            rows={6}
-            variant="outlined"
-            value={coverLetter}
-            onChange={(e) => setCoverLetter(e.target.value)}
-          />
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog} color="secondary">
+          <Button onClick={handleCloseDialog} color="primary">
             Annuler
           </Button>
-          <Button 
-            onClick={handleApply} 
-            color="primary" 
-            variant="contained"
-            disabled={applying}
-          >
-            {applying ? <CircularProgress size={24} /> : 'Envoyer ma candidature'}
+          <Button onClick={handleApply} color="primary" disabled={applying}>
+            {applying ? <CircularProgress size={24} /> : 'Confirmer'}
           </Button>
         </DialogActions>
       </Dialog>

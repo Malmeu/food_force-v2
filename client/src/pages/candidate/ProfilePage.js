@@ -58,7 +58,8 @@ const ProfilePage = () => {
               education: profileData.education || '',
               experienceLevel: profileData.experienceLevel || '',
               skills: profileData.skills || [],
-              preferredSectors: profileData.preferredSectors || []
+              preferredSectors: profileData.preferredSectors || [],
+              preferredContractTypes: profileData.preferredContractTypes || []
             };
             
             console.log('Données formatées pour l\'affichage (sans candidateProfile):', displayData);
@@ -109,7 +110,7 @@ const ProfilePage = () => {
     try {
       console.log('Données du formulaire à envoyer:', values);
       
-      // Structure simplifiée pour la mise à jour du profil
+      // Structure correcte pour la mise à jour du profil candidat selon le modèle MongoDB
       const profileData = {
         // Champs communs
         phone: values.phone,
@@ -119,14 +120,14 @@ const ProfilePage = () => {
           country: 'Maroc'
         },
         
-        // Champs du profil candidat directement au premier niveau
-        firstName: values.firstName,
-        lastName: values.lastName,
-        bio: values.bio,
-        education: values.education,
-        experienceLevel: values.experienceLevel,
-        skills: values.skills || [],
-        preferredSectors: values.preferredSectors || []
+        // Champs du profil candidat dans le sous-objet candidateProfile
+        candidateProfile: {
+          firstName: values.firstName,
+          lastName: values.lastName,
+          skills: values.skills || [],
+          preferredSectors: values.preferredSectors || [],
+          preferredContractTypes: values.preferredContractTypes || []
+        }
       };
       
       console.log('Données structurées à envoyer:', profileData);
@@ -457,7 +458,8 @@ const ProfilePage = () => {
                   education: profileData?.education || profileData?.candidateProfile?.education || '',
                   experienceLevel: profileData?.experienceLevel || profileData?.candidateProfile?.experienceLevel || 'entry',
                   skills: profileData?.skills || profileData?.candidateProfile?.skills || [],
-                  preferredSectors: profileData?.preferredSectors || profileData?.candidateProfile?.preferredSectors || []
+                  preferredSectors: profileData?.preferredSectors || profileData?.candidateProfile?.preferredSectors || [],
+                  preferredContractTypes: profileData?.preferredContractTypes || profileData?.candidateProfile?.preferredContractTypes || []
                 }}
                 validationSchema={validationSchema}
                 onSubmit={handleSubmit}
@@ -596,6 +598,28 @@ const ProfilePage = () => {
                         </TextField>
                       </Grid>
                       
+                      <Grid item xs={12}>
+                        <Typography variant="subtitle1" gutterBottom>
+                          Types de contrats préférés
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                          {['Permanent', 'Temporaire', 'Intérim', 'Extra', 'Saisonnier', 'Stage'].map((type) => (
+                            <Chip
+                              key={type}
+                              label={type}
+                              color={values.preferredContractTypes.includes(type) ? 'primary' : 'default'}
+                              onClick={() => {
+                                const updatedTypes = values.preferredContractTypes.includes(type)
+                                  ? values.preferredContractTypes.filter(t => t !== type)
+                                  : [...values.preferredContractTypes, type];
+                                setFieldValue('preferredContractTypes', updatedTypes);
+                              }}
+                              sx={{ m: 0.5 }}
+                            />
+                          ))}
+                        </Box>
+                      </Grid>
+                      
                       <Grid item xs={12} sx={{ mt: 2 }}>
                         <Button
                           type="submit"
@@ -675,6 +699,26 @@ const ProfilePage = () => {
                   ) : (
                     <Typography variant="body2" color="text.secondary">
                       Aucun secteur préféré renseigné
+                    </Typography>
+                  )}
+                </Box>
+                
+                <Divider sx={{ my: 2 }} />
+                
+                <Box>
+                  <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
+                    Types de contrats préférés
+                  </Typography>
+                  
+                  {(profileData?.preferredContractTypes || profileData?.candidateProfile?.preferredContractTypes) && (profileData?.preferredContractTypes?.length > 0 || profileData?.candidateProfile?.preferredContractTypes?.length > 0) ? (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                      {(profileData?.preferredContractTypes || profileData?.candidateProfile?.preferredContractTypes || []).map((type, index) => (
+                        <Chip key={index} label={type} color="primary" variant="outlined" size="small" />
+                      ))}
+                    </Box>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      Aucun type de contrat préféré renseigné
                     </Typography>
                   )}
                 </Box>

@@ -24,6 +24,8 @@ import {
   StepLabel,
   CircularProgress,
   Autocomplete,
+  FormControlLabel,
+  Switch,
 } from '@mui/material';
 
 import { getCities, getRegionForCity } from '../utils/moroccanCities';
@@ -115,6 +117,7 @@ const RegisterPage = () => {
       name: '',
       description: '',
       sector: '',
+      servesAlcohol: false,
       companySize: '',
       contactPerson: {
         firstName: '',
@@ -341,11 +344,29 @@ const RegisterPage = () => {
                     onChange={formik.handleChange}
                     onBlur={formik.handleBlur}
                   >
-                    <MenuItem value="Restauration">Restauration</MenuItem>
-                    <MenuItem value="Hôtellerie">Hôtellerie</MenuItem>
-                    <MenuItem value="Événementiel">Événementiel</MenuItem>
-                    <MenuItem value="Vente">Vente</MenuItem>
-                    <MenuItem value="Logistique">Logistique</MenuItem>
+                    <MenuItem value="Bar">Bar</MenuItem>
+                    <MenuItem value="Restaurant">Restaurant</MenuItem>
+                    <MenuItem value="Restaurant collectif">Restaurant collectif</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <FormControl fullWidth>
+                  <InputLabel id="preferred-contract-types-label">Types de contrats préférés</InputLabel>
+                  <Select
+                    labelId="preferred-contract-types-label"
+                    id="candidateProfile.preferredContractTypes"
+                    name="candidateProfile.preferredContractTypes"
+                    multiple
+                    value={formik.values.candidateProfile.preferredContractTypes}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
+                  >
+                    <MenuItem value="CDD">CDD</MenuItem>
+                    <MenuItem value="Saisonnier">Saisonnier</MenuItem>
+                    <MenuItem value="Intérim">Intérim</MenuItem>
+                    <MenuItem value="Extra">Extra</MenuItem>
+                    <MenuItem value="Stage">Stage</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
@@ -449,16 +470,28 @@ const RegisterPage = () => {
                     onBlur={formik.handleBlur}
                     error={formik.touched.establishmentProfile?.sector && Boolean(formik.errors.establishmentProfile?.sector)}
                   >
-                    <MenuItem value="Restauration">Restauration</MenuItem>
-                    <MenuItem value="Hôtellerie">Hôtellerie</MenuItem>
-                    <MenuItem value="Événementiel">Événementiel</MenuItem>
-                    <MenuItem value="Vente">Vente</MenuItem>
-                    <MenuItem value="Logistique">Logistique</MenuItem>
+                    <MenuItem value="Bar">Bar</MenuItem>
+                    <MenuItem value="Restaurant">Restaurant</MenuItem>
+                    <MenuItem value="Restaurant collectif">Restaurant collectif</MenuItem>
                   </Select>
                   {formik.touched.establishmentProfile?.sector && formik.errors.establishmentProfile?.sector && (
                     <FormHelperText error>{formik.errors.establishmentProfile.sector}</FormHelperText>
                   )}
                 </FormControl>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      id="establishmentProfile.servesAlcohol"
+                      name="establishmentProfile.servesAlcohol"
+                      checked={formik.values.establishmentProfile.servesAlcohol}
+                      onChange={formik.handleChange}
+                      color="primary"
+                    />
+                  }
+                  label="Établissement servant de l'alcool"
+                />
               </Grid>
               <Grid item xs={12} sm={6}>
                 <FormControl fullWidth>

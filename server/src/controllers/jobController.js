@@ -28,7 +28,8 @@ exports.createJob = async (req, res) => {
       title: req.body.title || 'Offre d\'emploi',
       description: req.body.description || 'Description de l\'offre',
       contractType: req.body.contractType || 'CDI',
-      sector: req.body.sector || 'Restauration',
+      sector: req.body.sector || 'Restaurant',
+      servesAlcohol: req.body.servesAlcohol || false,
       experienceLevel: req.body.experienceLevel || 'Débutant',
       startDate: req.body.startDate ? new Date(req.body.startDate) : new Date(),
       employer: req.user.id,
@@ -130,6 +131,17 @@ exports.getJobs = async (req, res) => {
     // Trouver les offres d'emploi actives uniquement
     const parsedQuery = JSON.parse(queryStr);
     
+    // Traitement spécial pour le filtre servesAlcohol (conversion string -> boolean)
+    if (parsedQuery.servesAlcohol !== undefined) {
+      if (parsedQuery.servesAlcohol === 'true') {
+        parsedQuery.servesAlcohol = true;
+      } else if (parsedQuery.servesAlcohol === 'false') {
+        parsedQuery.servesAlcohol = false;
+      } else {
+        delete parsedQuery.servesAlcohol; // Ignorer si la valeur n'est pas valide
+      }
+    }
+    
     // Ne filtrer par statut que si spécifiquement demandé
     // Si status=all, afficher toutes les offres
     if (req.query.status === 'all') {
@@ -211,10 +223,8 @@ exports.getJobs = async (req, res) => {
 // @access  Public
 exports.getJob = async (req, res) => {
   try {
-    const job = await Job.findById(req.params.id).populate({
-      path: 'employer',
-      select: 'establishmentProfile.name establishmentProfile.logo establishmentProfile.description'
-    });
+    // Ne plus inclure les informations de l'employeur
+    const job = await Job.findById(req.params.id);
 
     if (!job) {
       return res.status(404).json({

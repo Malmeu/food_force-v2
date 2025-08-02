@@ -44,6 +44,7 @@ import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 import BookmarkIcon from '@mui/icons-material/Bookmark';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import LocalBarIcon from '@mui/icons-material/LocalBar';
 
 const JobsPage = () => {
   const theme = useTheme();
@@ -63,6 +64,7 @@ const JobsPage = () => {
     sector: '',
     contractType: '',
     city: '',
+    servesAlcohol: '',
   });
 
   // Charger les offres d'emploi au chargement de la page et lors des changements de filtres
@@ -88,6 +90,7 @@ const JobsPage = () => {
       if (filters.contractType) params.contractType = filters.contractType;
       if (filters.city) params['location.city'] = filters.city;
       if (filters.search && filters.search.trim() !== '') params.search = filters.search.trim();
+      if (filters.servesAlcohol !== '') params.servesAlcohol = filters.servesAlcohol;
       
       console.log('Paramètres de la requête:', params);
       
@@ -380,13 +383,9 @@ const JobsPage = () => {
                   onChange={handleFilterChange}
                 >
                   <MenuItem value="">Tous les secteurs</MenuItem>
-                  <MenuItem value="Restauration">Restauration</MenuItem>
-                  <MenuItem value="Hôtellerie">Hôtellerie</MenuItem>
-                  <MenuItem value="Café">Café</MenuItem>
-                  <MenuItem value="Boulangerie">Boulangerie</MenuItem>
-                  <MenuItem value="Pâtisserie">Pâtisserie</MenuItem>
-                  <MenuItem value="Traiteur">Traiteur</MenuItem>
-                  <MenuItem value="Fast-food">Fast-food</MenuItem>
+                  <MenuItem value="Bar">Bar</MenuItem>
+                  <MenuItem value="Restaurant">Restaurant</MenuItem>
+                  <MenuItem value="Restaurant collectif">Restaurant collectif</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
@@ -406,6 +405,22 @@ const JobsPage = () => {
                   <MenuItem value="Stage">Stage</MenuItem>
                   <MenuItem value="Freelance">Freelance</MenuItem>
                   <MenuItem value="Temps partiel">Temps partiel</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            
+            <Grid item xs={12} sm={6} md={2}>
+              <FormControl fullWidth>
+                <InputLabel>Service d'alcool</InputLabel>
+                <Select
+                  name="servesAlcohol"
+                  value={filters.servesAlcohol}
+                  label="Service d'alcool"
+                  onChange={handleFilterChange}
+                >
+                  <MenuItem value="">Tous les établissements</MenuItem>
+                  <MenuItem value="true">Avec alcool</MenuItem>
+                  <MenuItem value="false">Sans alcool</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
@@ -535,14 +550,15 @@ const JobsPage = () => {
               />
             </Box>
             
-            <Grid container spacing={3}>
+            <Grid container spacing={2}>
               {displayedJobs.map((job) => (
-                <Grid item xs={12} key={job.id}>
+                <Grid item xs={12} sm={6} md={4} key={job.id}>
                   <Card 
-                    elevation={3} 
+                    elevation={2} 
                     sx={{
+                      height: '100%',
                       display: 'flex',
-                      flexDirection: { xs: 'column', md: 'row' },
+                      flexDirection: 'column',
                       transition: 'transform 0.2s, box-shadow 0.2s',
                       borderRadius: 2,
                       overflow: 'hidden',
@@ -550,136 +566,85 @@ const JobsPage = () => {
                       borderColor: 'divider',
                       '&:hover': {
                         transform: 'translateY(-4px)',
-                        boxShadow: 6,
+                        boxShadow: 4,
                         borderColor: 'primary.light',
                       },
                     }}
                   >
-                    <CardMedia
-                      component="img"
-                      sx={{
-                        width: { xs: '100%', md: 150 },
-                        height: { xs: 140, md: 'auto' },
-                        objectFit: 'contain',
-                        p: 2,
-                        bgcolor: 'background.paper'
-                      }}
-                      image={job.logo || '/images/default-company-logo.png'}
-                      alt={job.company}
-                    />
                     
-                    <Box sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
-                      <CardContent>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-                          <Box>
-                            <Typography variant="h6" component="h2" gutterBottom>
-                              {job.title}
-                            </Typography>
-                            <Typography variant="subtitle1" color="text.secondary" gutterBottom>
-                              {job.company}
-                            </Typography>
-                          </Box>
-                          <Chip 
-                            label={job.contractType} 
-                            color="primary" 
-                            size="small" 
-                            sx={{ fontWeight: 'medium' }}
-                          />
-                        </Box>
-                        
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-                          {job.description}
+                    <CardContent sx={{ pb: 1 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                        <Typography variant="h6" component="h2" sx={{ fontSize: '1rem', fontWeight: 'bold' }}>
+                          {job.title}
                         </Typography>
-                        
-                        <Grid container spacing={2}>
-                          <Grid item xs={12} sm={6}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                              <Avatar sx={{ bgcolor: alpha(theme.palette.primary.main, 0.1), mr: 1, width: 32, height: 32 }}>
-                                <LocationOnIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />
-                              </Avatar>
-                              <Typography variant="body2" fontWeight="medium">
-                                {job.location}
-                              </Typography>
-                            </Box>
-                          </Grid>
-                          
-                          <Grid item xs={12} sm={6}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                              <Avatar sx={{ bgcolor: alpha(theme.palette.success.main, 0.1), mr: 1, width: 32, height: 32 }}>
-                                <AttachMoneyIcon fontSize="small" sx={{ color: theme.palette.success.main }} />
-                              </Avatar>
-                              <Typography variant="body2" fontWeight="medium">
-                                {job.formattedSalary}
-                              </Typography>
-                            </Box>
-                          </Grid>
-                          
-                          <Grid item xs={12} sm={6}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                              <Avatar sx={{ bgcolor: alpha(theme.palette.secondary.main, 0.1), mr: 1, width: 32, height: 32 }}>
-                                <WorkIcon fontSize="small" sx={{ color: theme.palette.secondary.main }} />
-                              </Avatar>
-                              <Typography variant="body2" fontWeight="medium">
-                                {job.sector}
-                              </Typography>
-                            </Box>
-                          </Grid>
-                          
-                          <Grid item xs={12} sm={6}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                              <Avatar sx={{ bgcolor: alpha(theme.palette.info.main, 0.1), mr: 1, width: 32, height: 32 }}>
-                                <CalendarTodayIcon fontSize="small" sx={{ color: theme.palette.info.main }} />
-                              </Avatar>
-                              <Typography variant="body2" fontWeight="medium">
-                                Début: {job.startDate ? (typeof job.startDate === 'string' ? new Date(job.startDate).toLocaleDateString('fr-FR') : job.startDate.toLocaleDateString('fr-FR')) : 'Non spécifié'}
-                              </Typography>
-                            </Box>
-                          </Grid>
-                        </Grid>
-                      </CardContent>
+                        <Chip 
+                          label={job.contractType} 
+                          color="primary" 
+                          size="small" 
+                          sx={{ fontWeight: 'medium', fontSize: '0.7rem' }}
+                        />
+                      </Box>
                       
-                      <Divider />
+                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                        <LocationOnIcon fontSize="small" sx={{ color: 'primary.main', mr: 0.5, fontSize: '0.9rem' }} />
+                        <Typography variant="body2" color="text.secondary">
+                          {job.location.city}
+                        </Typography>
+                        <Box component="span" sx={{ mx: 0.5 }}>•</Box>
+                        <WorkIcon fontSize="small" sx={{ color: 'secondary.main', mr: 0.5, fontSize: '0.9rem' }} />
+                        <Typography variant="body2" color="text.secondary">
+                          {job.sector}
+                        </Typography>
+                      </Box>
                       
-                      <CardActions sx={{ justifyContent: 'space-between', px: 2 }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', height: '40px' }}>
+                        {job.description}
+                      </Typography>
+                      
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <AccessTimeIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
-                          <Typography variant="body2" color="text.secondary">
-                            {job.workingHours ? `${job.workingHours.start} - ${job.workingHours.end}` : 'Horaires non spécifiés'}
+                          <AttachMoneyIcon fontSize="small" sx={{ color: 'success.main', mr: 0.5, fontSize: '0.9rem' }} />
+                          <Typography variant="body2" fontWeight="medium" fontSize="0.8rem">
+                            {job.salary ? `${job.salary} DH` : 'À négocier'}
                           </Typography>
                         </Box>
                         
-                        <Box>
-                          <Tooltip title="Sauvegarder l'offre">
-                            <IconButton 
-                              color={savedJobs.includes(job.id) ? "primary" : "default"}
-                              onClick={() => toggleSaveJob(job.id)}
-                              size="small"
-                              sx={{ mr: 1 }}
-                            >
-                              {savedJobs.includes(job.id) ? <BookmarkIcon /> : <BookmarkBorderIcon />}
-                            </IconButton>
-                          </Tooltip>
-                          
-                          <Button 
-                            component={Link} 
-                            to={`/jobs/${job._id}`} 
-                            variant="contained" 
-                            size="small"
-                            sx={{
-                              borderRadius: '20px',
-                              px: 2,
-                              fontWeight: 'bold',
-                              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                              transition: 'all 0.3s ease',
-                              '&:hover': {
-                                transform: 'scale(1.05)',
-                                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                              }
-                            }}
-                          >
-                            Voir détails
-                          </Button>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <LocalBarIcon fontSize="small" sx={{ color: job.servesAlcohol ? 'warning.main' : 'success.light', mr: 0.5, fontSize: '0.9rem' }} />
+                          <Typography variant="body2" fontSize="0.8rem">
+                            {job.servesAlcohol ? 'Avec alcool' : 'Sans alcool'}
+                          </Typography>
                         </Box>
+                      </Box>
+                    </CardContent>
+                    
+                    <Box sx={{ mt: 'auto' }}>
+                      <Divider />
+                      <CardActions sx={{ justifyContent: 'space-between', px: 2, py: 1 }}>
+                        <Tooltip title="Sauvegarder l'offre">
+                          <IconButton 
+                            color={savedJobs.includes(job.id) ? "primary" : "default"}
+                            onClick={() => toggleSaveJob(job.id)}
+                            size="small"
+                          >
+                            {savedJobs.includes(job.id) ? <BookmarkIcon fontSize="small" /> : <BookmarkBorderIcon fontSize="small" />}
+                          </IconButton>
+                        </Tooltip>
+                        
+                        <Button 
+                          component={Link} 
+                          to={`/jobs/${job._id}`} 
+                          variant="contained" 
+                          size="small"
+                          sx={{
+                            borderRadius: '20px',
+                            px: 2,
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold'
+                          }}
+                        >
+                          Voir détails
+                        </Button>
                       </CardActions>
                     </Box>
                   </Card>

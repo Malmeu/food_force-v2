@@ -1,12 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Grid, Paper, Typography, TextField, Button, Box, Avatar, Chip, Divider, Alert, CircularProgress } from '@mui/material';
+import {
+  Container, Grid, Paper, Typography, TextField, Button, Box, Avatar,
+  Chip, Divider, Alert, CircularProgress, Card, CardContent, CardHeader,
+  IconButton, Tab, Tabs, Tooltip, Stack, Badge, FormControlLabel, Switch
+} from '@mui/material';
 import { toast } from 'react-toastify';
 import { Formik, Form, Field } from 'formik';
 import * as Yup from 'yup';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { useAuth } from '../../contexts/AuthContext';
 import { userAPI } from '../../utils/api';
-import { sectors } from '../../utils/config';
+
+// Icons
+import EditIcon from '@mui/icons-material/Edit';
+import SaveIcon from '@mui/icons-material/Save';
+import CancelIcon from '@mui/icons-material/Cancel';
+import BusinessIcon from '@mui/icons-material/Business';
+import PersonIcon from '@mui/icons-material/Person';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
+import PhoneIcon from '@mui/icons-material/Phone';
+import EmailIcon from '@mui/icons-material/Email';
+import LanguageIcon from '@mui/icons-material/Language';
+import FacebookIcon from '@mui/icons-material/Facebook';
+import InstagramIcon from '@mui/icons-material/Instagram';
+import LinkedInIcon from '@mui/icons-material/LinkedIn';
+import WorkIcon from '@mui/icons-material/Work';
+import DescriptionIcon from '@mui/icons-material/Description';
+import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 
 const ProfileSchema = Yup.object().shape({
   establishmentName: Yup.string().required('Le nom de l\'u00e9tablissement est requis'),
@@ -36,6 +56,13 @@ const ProfilePage = () => {
   const [logoImage, setLogoImage] = useState('');
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState(0);
+  const [editMode, setEditMode] = useState(false);
+  
+  // Gestion du changement d'onglet
+  const handleTabChange = (event, newValue) => {
+    setActiveTab(newValue);
+  };
 
   // Charger les donnu00e9es du profil au chargement du composant
   useEffect(() => {
@@ -78,6 +105,7 @@ const ProfilePage = () => {
     description: userData?.establishmentProfile?.description || '',
     website: userData?.establishmentProfile?.website || '',
     sectors: userData?.establishmentProfile?.sector ? [userData.establishmentProfile.sector] : [],
+    servesAlcohol: userData?.establishmentProfile?.servesAlcohol || false,
     contactPerson: userData?.establishmentProfile?.contactPerson ? 
       `${userData.establishmentProfile.contactPerson.firstName || ''} ${userData.establishmentProfile.contactPerson.lastName || ''}`.trim() : '',
     contactPosition: userData?.establishmentProfile?.contactPerson?.position || '',
@@ -119,7 +147,8 @@ const ProfilePage = () => {
           name: values.establishmentName,
           description: values.description,
           website: values.website,
-          sector: values.sectors[0] || '',  // Le modu00e8le attend une chau00eene, pas un tableau
+          sector: values.sectors[0] || 'Restaurant',  // Le modu00e8le attend une chau00eene, pas un tableau et doit être une des valeurs de l'enum
+          servesAlcohol: values.servesAlcohol, // Utiliser la valeur du switch
           companySize: values.employeesCount.toString(),
           foundedYear: parseInt(values.foundedYear),
           socialMedia: {
@@ -198,14 +227,22 @@ const ProfilePage = () => {
     
     console.log('Envoi de la photo de profil...');
     try {
-      const response = await userAPI.uploadFile(formData);
-      console.log('Ru00e9ponse de l\'API:', response.data);
-      if (response.data.success) {
-        setProfileImage(response.data.imageUrl);
+      // Utiliser une fonction d'upload générique
+      const response = await fetch('/api/users/upload', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+      const data = await response.json();
+      console.log('Ru00e9ponse de l\'API:', data);
+      if (data.success) {
+        setProfileImage(data.imageUrl);
         setError('');
         toast.success('Photo de profil mise u00e0 jour avec succu00e8s');
       } else {
-        throw new Error(response.data.message || 'Erreur lors du tu00e9lu00e9chargement de l\'image');
+        throw new Error(data.message || 'Erreur lors du tu00e9lu00e9chargement de l\'image');
       }
     } catch (err) {
       console.error('Erreur lors du tu00e9lu00e9chargement de l\'image:', err);
@@ -238,14 +275,22 @@ const ProfilePage = () => {
     
     console.log('Envoi du logo...');
     try {
-      const response = await userAPI.uploadFile(formData);
-      console.log('Ru00e9ponse de l\'API:', response.data);
-      if (response.data.success) {
-        setLogoImage(response.data.imageUrl);
+      // Utiliser une fonction d'upload générique
+      const response = await fetch('/api/users/upload', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+      const data = await response.json();
+      console.log('Ru00e9ponse de l\'API:', data);
+      if (data.success) {
+        setLogoImage(data.imageUrl);
         setError('');
         toast.success('Logo mis u00e0 jour avec succu00e8s');
       } else {
-        throw new Error(response.data.message || 'Erreur lors du tu00e9lu00e9chargement du logo');
+        throw new Error(data.message || 'Erreur lors du tu00e9lu00e9chargement du logo');
       }
     } catch (err) {
       console.error('Erreur lors du tu00e9lu00e9chargement du logo:', err);
@@ -255,7 +300,20 @@ const ProfilePage = () => {
   };
 
   // Extraire le nom de l'u00e9tablissement pour l'affichage
-  const establishmentName = userData?.establishmentProfile?.name || 'u00c9tablissement';
+  const establishmentName = userData?.establishmentProfile?.name || 'Établissement';
+
+  // Activation/désactivation du mode édition
+  const toggleEditMode = () => {
+    setEditMode(!editMode);
+  };
+
+  // Liste des secteurs d'activité correspondant exactement à l'enum dans le modèle User.js
+  const sectors = [
+    { value: 'Bar', label: 'Bar' },
+    { value: 'Restaurant', label: 'Restaurant' },
+    { value: 'Restaurant collectif', label: 'Restaurant collectif' },
+  ];
+
   
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
@@ -265,14 +323,144 @@ const ProfilePage = () => {
         </Box>
       ) : (
         <>
-          {/* Titre de la page avec le nom de l'u00e9tablissement */}
-          <Typography variant="h4" component="h1" gutterBottom>
-            Profil de {establishmentName}
-          </Typography>
+          {/* En-tête avec bannière et informations principales */}
+          <Paper 
+            elevation={3} 
+            sx={{ 
+              p: 0, 
+              mb: 3, 
+              borderRadius: 2, 
+              overflow: 'hidden',
+              position: 'relative'
+            }}
+          >
+            {/* Bannière avec option de modification */}
+            <Box 
+              sx={{ 
+                height: 200, 
+                bgcolor: 'primary.main', 
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'flex-end',
+                justifyContent: 'center',
+                backgroundImage: 'linear-gradient(45deg, #3f51b5 30%, #2196f3 90%)'
+              }}
+            >
+              <Tooltip title="Modifier la photo de couverture">
+                <IconButton 
+                  sx={{ 
+                    position: 'absolute', 
+                    top: 10, 
+                    right: 10, 
+                    bgcolor: 'rgba(255,255,255,0.8)',
+                    '&:hover': { bgcolor: 'rgba(255,255,255,0.9)' }
+                  }}
+                  component="label"
+                >
+                  <input
+                    type="file"
+                    hidden
+                    accept="image/*"
+                    onChange={handleProfileImageUpload}
+                  />
+                  <PhotoCameraIcon />
+                </IconButton>
+              </Tooltip>
+            </Box>
+            
+            {/* Logo et informations principales */}
+            <Box sx={{ 
+              display: 'flex', 
+              px: 3, 
+              pb: 3,
+              flexDirection: { xs: 'column', sm: 'row' },
+              alignItems: { xs: 'center', sm: 'flex-start' }
+            }}>
+              <Badge
+                overlap="circular"
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                badgeContent={
+                  <Tooltip title="Modifier le logo">
+                    <IconButton
+                      component="label"
+                      sx={{ bgcolor: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.9)' } }}
+                    >
+                      <input
+                        type="file"
+                        hidden
+                        accept="image/*"
+                        onChange={handleLogoUpload}
+                      />
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                }
+              >
+                <Avatar 
+                  src={logoImage || ''} 
+                  alt={establishmentName}
+                  sx={{ 
+                    width: 120, 
+                    height: 120, 
+                    border: '4px solid white',
+                    mt: '-60px',
+                    bgcolor: 'secondary.main',
+                    fontSize: '3rem'
+                  }}
+                >
+                  {establishmentName.charAt(0)}
+                </Avatar>
+              </Badge>
+              
+              <Box sx={{ 
+                ml: { xs: 0, sm: 3 }, 
+                mt: { xs: 2, sm: 0 },
+                textAlign: { xs: 'center', sm: 'left' },
+                flexGrow: 1
+              }}>
+                <Typography variant="h4" component="h1" gutterBottom>
+                  {establishmentName}
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: { xs: 'center', sm: 'flex-start' } }}>
+                  {userData?.establishmentProfile?.sector && (
+                    <Chip 
+                      icon={<WorkIcon />} 
+                      label={sectors.find(s => s.value === userData.establishmentProfile.sector)?.label || userData.establishmentProfile.sector} 
+                      color="primary" 
+                      variant="outlined" 
+                    />
+                  )}
+                  {userData?.address?.city && (
+                    <Chip 
+                      icon={<LocationOnIcon />} 
+                      label={userData.address.city} 
+                      variant="outlined" 
+                    />
+                  )}
+                  {userData?.establishmentProfile?.foundedYear && (
+                    <Chip 
+                      label={`Fondé en ${userData.establishmentProfile.foundedYear}`} 
+                      variant="outlined" 
+                    />
+                  )}
+                </Box>
+              </Box>
+              
+              <Button
+                variant="contained"
+                color={editMode ? "error" : "primary"}
+                startIcon={editMode ? <CancelIcon /> : <EditIcon />}
+                onClick={toggleEditMode}
+                sx={{ alignSelf: { xs: 'center', sm: 'flex-start' }, mt: { xs: 2, sm: 0 } }}
+              >
+                {editMode ? "Annuler" : "Modifier le profil"}
+              </Button>
+            </Box>
+          </Paper>
           
           {success && (
             <Alert severity="success" sx={{ mb: 3 }}>
-              Votre profil a u00e9tu00e9 mis u00e0 jour avec succu00e8s.
+              Votre profil a été mis à jour avec succès.
             </Alert>
           )}
           
@@ -282,6 +470,23 @@ const ProfilePage = () => {
             </Alert>
           )}
           
+          {/* Navigation par onglets */}
+          <Paper sx={{ borderRadius: 2, mb: 3 }}>
+            <Tabs 
+              value={activeTab} 
+              onChange={handleTabChange} 
+              variant="fullWidth"
+              textColor="primary"
+              indicatorColor="primary"
+              aria-label="onglets du profil"
+            >
+              <Tab icon={<BusinessIcon />} label="Informations générales" />
+              <Tab icon={<PersonIcon />} label="Contact" />
+              <Tab icon={<DescriptionIcon />} label="Description" />
+              <Tab icon={<LanguageIcon />} label="Réseaux sociaux" />
+            </Tabs>
+          </Paper>
+          
           <Formik
             initialValues={initialValues}
             validationSchema={ProfileSchema}
@@ -290,357 +495,397 @@ const ProfilePage = () => {
           >
             {({ values, errors, touched, handleChange, handleBlur, isSubmitting, setFieldValue }) => (
               <Form>
-                <Grid container spacing={3}>
-                  {/* Colonne de gauche */}
-                  <Grid item xs={12} md={4}>
-                    <Paper sx={{ p: 3, mb: 3 }}>
-                      <Typography variant="h6" gutterBottom>
-                        Images
-                      </Typography>
-                      
-                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 3 }}>
-                        <Typography variant="subtitle1" gutterBottom>
-                          Photo de profil
-                        </Typography>
-                        
-                        <Avatar 
-                          src={profileImage} 
-                          alt={values.establishmentName}
-                          sx={{ width: 100, height: 100, mb: 2 }}
-                        />
-                        
-                        <Button
-                          component="label"
-                          variant="outlined"
-                          startIcon={<CloudUploadIcon />}
-                        >
-                          Changer la photo
-                          <input
-                            type="file"
-                            hidden
-                            accept="image/*"
-                            onChange={handleProfileImageUpload}
-                          />
-                        </Button>
-                      </Box>
-                      
-                      <Divider sx={{ my: 2 }} />
-                      
-                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                        <Typography variant="subtitle1" gutterBottom>
-                          Logo de l'u00e9tablissement
-                        </Typography>
-                        
-                        <Avatar 
-                          src={logoImage} 
-                          alt="Logo"
-                          sx={{ width: 100, height: 100, mb: 2 }}
-                        />
-                        
-                        <Button
-                          component="label"
-                          variant="outlined"
-                          startIcon={<CloudUploadIcon />}
-                        >
-                          Changer le logo
-                          <input
-                            type="file"
-                            hidden
-                            accept="image/*"
-                            onChange={handleLogoUpload}
-                          />
-                        </Button>
-                      </Box>
-                    </Paper>
-                  </Grid>
+                {/* Contenu des onglets */}
+                <Box sx={{ mt: 2 }}>
+                  {/* Onglet 1: Informations générales */}
+                  {activeTab === 0 && (
+                    <Card elevation={0} sx={{ p: 2, borderRadius: 2 }}>
+                      <CardContent>
+                        <Grid container spacing={3}>
+                          <Grid item xs={12} md={6}>
+                            <Box sx={{ mb: 3 }}>
+                              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                                <BusinessIcon sx={{ mr: 1 }} /> Informations de l'établissement
+                              </Typography>
+                              <Divider sx={{ mb: 2 }} />
+                              
+                              <TextField
+                                fullWidth
+                                id="establishmentName"
+                                name="establishmentName"
+                                label="Nom de l'établissement"
+                                value={values.establishmentName}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                                error={touched.establishmentName && Boolean(errors.establishmentName)}
+                                helperText={touched.establishmentName && errors.establishmentName}
+                                margin="normal"
+                                disabled={!editMode}
+                                InputProps={{
+                                  startAdornment: <BusinessIcon color="action" sx={{ mr: 1 }} />
+                                }}
+                              />
+                            </Box>
+                            
+                            <Box sx={{ mb: 3 }}>
+                              <Typography variant="subtitle1" gutterBottom>
+                                Secteur d'activité
+                              </Typography>
+                              
+                              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, my: 2 }}>
+                                {sectors.map((sector) => (
+                                  <Chip
+                                    key={sector.value}
+                                    label={sector.label}
+                                    onClick={() => {
+                                      if (!editMode) return;
+                                      const currentSectors = [...values.sectors];
+                                      if (currentSectors.includes(sector.value)) {
+                                        setFieldValue(
+                                          'sectors',
+                                          currentSectors.filter((s) => s !== sector.value)
+                                        );
+                                      } else {
+                                        setFieldValue('sectors', [...currentSectors, sector.value]);
+                                      }
+                                    }}
+                                    color={values.sectors.includes(sector.value) ? 'primary' : 'default'}
+                                    variant={values.sectors.includes(sector.value) ? 'filled' : 'outlined'}
+                                    disabled={!editMode}
+                                  />
+                                ))}
+                              </Box>
+                              
+                              {touched.sectors && errors.sectors && (
+                                <Typography color="error" variant="caption">
+                                  {errors.sectors}
+                                </Typography>
+                              )}
+                            </Box>
+                            
+                            <Box sx={{ mt: 2 }}>
+                              <FormControlLabel
+                                control={
+                                  <Switch
+                                    checked={values.servesAlcohol}
+                                    onChange={(e) => setFieldValue('servesAlcohol', e.target.checked)}
+                                    name="servesAlcohol"
+                                    color="primary"
+                                    disabled={!editMode}
+                                  />
+                                }
+                                label="Cet établissement sert de l'alcool"
+                              />
+                            </Box>
+                          </Grid>
+                          
+                          <Grid item xs={12} md={6}>
+                            <Box sx={{ mb: 3 }}>
+                              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                                <LocationOnIcon sx={{ mr: 1 }} /> Localisation
+                              </Typography>
+                              <Divider sx={{ mb: 2 }} />
+                              
+                              <TextField
+                                fullWidth
+                                id="address"
+                                name="address"
+                                label="Adresse"
+                                value={values.address}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                                error={touched.address && Boolean(errors.address)}
+                                helperText={touched.address && errors.address}
+                                margin="normal"
+                                disabled={!editMode}
+                                InputProps={{
+                                  startAdornment: <LocationOnIcon color="action" sx={{ mr: 1 }} />
+                                }}
+                              />
+                              
+                              <TextField
+                                fullWidth
+                                id="city"
+                                name="city"
+                                label="Ville"
+                                value={values.city}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                                error={touched.city && Boolean(errors.city)}
+                                helperText={touched.city && errors.city}
+                                margin="normal"
+                                disabled={!editMode}
+                              />
+                            </Box>
+                            
+                            <Box sx={{ mb: 3 }}>
+                              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                                <WorkIcon sx={{ mr: 1 }} /> Détails de l'entreprise
+                              </Typography>
+                              <Divider sx={{ mb: 2 }} />
+                              
+                              <Grid container spacing={2}>
+                                <Grid item xs={12} sm={6}>
+                                  <TextField
+                                    fullWidth
+                                    id="foundedYear"
+                                    name="foundedYear"
+                                    label="Année de création"
+                                    type="number"
+                                    value={values.foundedYear}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                    error={touched.foundedYear && Boolean(errors.foundedYear)}
+                                    helperText={touched.foundedYear && errors.foundedYear}
+                                    margin="normal"
+                                    disabled={!editMode}
+                                  />
+                                </Grid>
+                                
+                                <Grid item xs={12} sm={6}>
+                                  <TextField
+                                    fullWidth
+                                    id="employeesCount"
+                                    name="employeesCount"
+                                    label="Nombre d'employés"
+                                    type="number"
+                                    value={values.employeesCount}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                    error={touched.employeesCount && Boolean(errors.employeesCount)}
+                                    helperText={touched.employeesCount && errors.employeesCount}
+                                    margin="normal"
+                                    disabled={!editMode}
+                                  />
+                                </Grid>
+                              </Grid>
+                            </Box>
+                          </Grid>
+                        </Grid>
+                      </CardContent>
+                    </Card>
+                  )}
+                  {/* Onglet 2: Contact */}
+                  {activeTab === 1 && (
+                    <Card elevation={0} sx={{ p: 2, borderRadius: 2 }}>
+                      <CardContent>
+                        <Grid container spacing={3}>
+                          <Grid item xs={12} md={6}>
+                            <Box sx={{ mb: 3 }}>
+                              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                                <PersonIcon sx={{ mr: 1 }} /> Informations de contact
+                              </Typography>
+                              <Divider sx={{ mb: 2 }} />
+                              
+                              <TextField
+                                fullWidth
+                                id="email"
+                                name="email"
+                                label="Email"
+                                value={values.email}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                                error={touched.email && Boolean(errors.email)}
+                                helperText={touched.email && errors.email}
+                                margin="normal"
+                                disabled={!editMode}
+                                InputProps={{
+                                  startAdornment: <EmailIcon color="action" sx={{ mr: 1 }} />
+                                }}
+                              />
+                              
+                              <TextField
+                                fullWidth
+                                id="phone"
+                                name="phone"
+                                label="Téléphone"
+                                value={values.phone}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                                error={touched.phone && Boolean(errors.phone)}
+                                helperText={touched.phone && errors.phone}
+                                margin="normal"
+                                disabled={!editMode}
+                                InputProps={{
+                                  startAdornment: <PhoneIcon color="action" sx={{ mr: 1 }} />
+                                }}
+                              />
+                              
+                              <TextField
+                                fullWidth
+                                id="website"
+                                name="website"
+                                label="Site web"
+                                value={values.website}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                                error={touched.website && Boolean(errors.website)}
+                                helperText={touched.website && errors.website}
+                                margin="normal"
+                                disabled={!editMode}
+                                InputProps={{
+                                  startAdornment: <LanguageIcon color="action" sx={{ mr: 1 }} />
+                                }}
+                              />
+                            </Box>
+                          </Grid>
+                          
+                          <Grid item xs={12} md={6}>
+                            <Box sx={{ mb: 3 }}>
+                              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                                <PersonIcon sx={{ mr: 1 }} /> Personne de contact
+                              </Typography>
+                              <Divider sx={{ mb: 2 }} />
+                              
+                              <TextField
+                                fullWidth
+                                id="contactPerson"
+                                name="contactPerson"
+                                label="Nom et prénom"
+                                value={values.contactPerson}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                                error={touched.contactPerson && Boolean(errors.contactPerson)}
+                                helperText={touched.contactPerson && errors.contactPerson}
+                                margin="normal"
+                                disabled={!editMode}
+                              />
+                              
+                              <TextField
+                                fullWidth
+                                id="contactPosition"
+                                name="contactPosition"
+                                label="Poste occupé"
+                                value={values.contactPosition}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                                error={touched.contactPosition && Boolean(errors.contactPosition)}
+                                helperText={touched.contactPosition && errors.contactPosition}
+                                margin="normal"
+                                disabled={!editMode}
+                              />
+                            </Box>
+                          </Grid>
+                        </Grid>
+                      </CardContent>
+                    </Card>
+                  )}
                   
-                  {/* Colonne de droite */}
-                  <Grid item xs={12} md={8}>
-                    <Paper sx={{ p: 3, mb: 3 }}>
-                      <Typography variant="h6" gutterBottom>
-                        Informations gu00e9nu00e9rales
-                      </Typography>
-                      
-                      <Grid container spacing={2}>
-                        <Grid item xs={12}>
-                          <TextField
-                            fullWidth
-                            id="establishmentName"
-                            name="establishmentName"
-                            label="Nom de l'u00e9tablissement"
-                            value={values.establishmentName}
-                            onChange={handleChange}
-                            onBlur={handleBlur}
-                            error={touched.establishmentName && Boolean(errors.establishmentName)}
-                            helperText={touched.establishmentName && errors.establishmentName}
-                            margin="normal"
-                          />
-                        </Grid>
-                        
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            id="email"
-                            name="email"
-                            label="Email"
-                            value={values.email}
-                            onChange={handleChange}
-                            onBlur={handleBlur}
-                            error={touched.email && Boolean(errors.email)}
-                            helperText={touched.email && errors.email}
-                            margin="normal"
-                          />
-                        </Grid>
-                        
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            id="phone"
-                            name="phone"
-                            label="Tu00e9lu00e9phone"
-                            value={values.phone}
-                            onChange={handleChange}
-                            onBlur={handleBlur}
-                            error={touched.phone && Boolean(errors.phone)}
-                            helperText={touched.phone && errors.phone}
-                            margin="normal"
-                          />
-                        </Grid>
-                        
-                        <Grid item xs={12}>
-                          <TextField
-                            fullWidth
-                            id="address"
-                            name="address"
-                            label="Adresse"
-                            value={values.address}
-                            onChange={handleChange}
-                            onBlur={handleBlur}
-                            error={touched.address && Boolean(errors.address)}
-                            helperText={touched.address && errors.address}
-                            margin="normal"
-                          />
-                        </Grid>
-                        
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            id="city"
-                            name="city"
-                            label="Ville"
-                            value={values.city}
-                            onChange={handleChange}
-                            onBlur={handleBlur}
-                            error={touched.city && Boolean(errors.city)}
-                            helperText={touched.city && errors.city}
-                            margin="normal"
-                          />
-                        </Grid>
-                        
-                        <Grid item xs={12}>
-                          <TextField
-                            fullWidth
-                            id="description"
-                            name="description"
-                            label="Description de l'u00e9tablissement"
-                            value={values.description}
-                            onChange={handleChange}
-                            onBlur={handleBlur}
-                            error={touched.description && Boolean(errors.description)}
-                            helperText={touched.description && errors.description}
-                            margin="normal"
-                            multiline
-                            rows={4}
-                          />
-                        </Grid>
-                        
-                        <Grid item xs={12}>
-                          <TextField
-                            fullWidth
-                            id="website"
-                            name="website"
-                            label="Site web"
-                            value={values.website}
-                            onChange={handleChange}
-                            onBlur={handleBlur}
-                            error={touched.website && Boolean(errors.website)}
-                            helperText={touched.website && errors.website}
-                            margin="normal"
-                          />
-                        </Grid>
-                      </Grid>
-                    </Paper>
-                    
-                    <Paper sx={{ p: 3, mb: 3 }}>
-                      <Typography variant="h6" gutterBottom>
-                        Secteurs d'activitu00e9
-                      </Typography>
-                      
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, my: 2 }}>
-                        {sectors.map((sector) => (
-                          <Chip
-                            key={sector.value}
-                            label={sector.label}
-                            onClick={() => {
-                              const currentSectors = [...values.sectors];
-                              if (currentSectors.includes(sector.value)) {
-                                setFieldValue(
-                                  'sectors',
-                                  currentSectors.filter((s) => s !== sector.value)
-                                );
-                              } else {
-                                setFieldValue('sectors', [...currentSectors, sector.value]);
-                              }
-                            }}
-                            color={values.sectors.includes(sector.value) ? 'primary' : 'default'}
-                            variant={values.sectors.includes(sector.value) ? 'filled' : 'outlined'}
-                          />
-                        ))}
-                      </Box>
-                      
-                      {touched.sectors && errors.sectors && (
-                        <Typography color="error" variant="caption">
-                          {errors.sectors}
+                  {/* Onglet 3: Description */}
+                  {activeTab === 2 && (
+                    <Card elevation={0} sx={{ p: 2, borderRadius: 2 }}>
+                      <CardContent>
+                        <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                          <DescriptionIcon sx={{ mr: 1 }} /> Description de l'établissement
                         </Typography>
-                      )}
-                    </Paper>
-                    
-                    <Paper sx={{ p: 3, mb: 3 }}>
-                      <Typography variant="h6" gutterBottom>
-                        Informations du00e9taillu00e9es
-                      </Typography>
-                      
-                      <Grid container spacing={2}>
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            id="contactPerson"
-                            name="contactPerson"
-                            label="Personne de contact"
-                            value={values.contactPerson}
-                            onChange={handleChange}
-                            onBlur={handleBlur}
-                            error={touched.contactPerson && Boolean(errors.contactPerson)}
-                            helperText={touched.contactPerson && errors.contactPerson}
-                            margin="normal"
-                          />
-                        </Grid>
+                        <Divider sx={{ mb: 2 }} />
                         
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            id="contactPosition"
-                            name="contactPosition"
-                            label="Poste de la personne de contact"
-                            value={values.contactPosition}
-                            onChange={handleChange}
-                            onBlur={handleBlur}
-                            error={touched.contactPosition && Boolean(errors.contactPosition)}
-                            helperText={touched.contactPosition && errors.contactPosition}
-                            margin="normal"
-                          />
-                        </Grid>
+                        <TextField
+                          fullWidth
+                          id="description"
+                          name="description"
+                          label="Description détaillée"
+                          value={values.description}
+                          onChange={handleChange}
+                          onBlur={handleBlur}
+                          error={touched.description && Boolean(errors.description)}
+                          helperText={touched.description && errors.description}
+                          margin="normal"
+                          multiline
+                          rows={8}
+                          disabled={!editMode}
+                          placeholder="Décrivez votre établissement, son histoire, ses valeurs et sa mission..."
+                        />
+                      </CardContent>
+                    </Card>
+                  )}
+                  
+                  {/* Onglet 4: Réseaux sociaux */}
+                  {activeTab === 3 && (
+                    <Card elevation={0} sx={{ p: 2, borderRadius: 2 }}>
+                      <CardContent>
+                        <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                          <LanguageIcon sx={{ mr: 1 }} /> Réseaux sociaux
+                        </Typography>
+                        <Divider sx={{ mb: 2 }} />
                         
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            id="foundedYear"
-                            name="foundedYear"
-                            label="Annu00e9e de cru00e9ation"
-                            type="number"
-                            value={values.foundedYear}
-                            onChange={handleChange}
-                            onBlur={handleBlur}
-                            error={touched.foundedYear && Boolean(errors.foundedYear)}
-                            helperText={touched.foundedYear && errors.foundedYear}
-                            margin="normal"
-                          />
+                        <Grid container spacing={2}>
+                          <Grid item xs={12} md={4}>
+                            <TextField
+                              fullWidth
+                              id="socialMedia.facebook"
+                              name="socialMedia.facebook"
+                              label="Facebook"
+                              value={values.socialMedia.facebook}
+                              onChange={handleChange}
+                              onBlur={handleBlur}
+                              error={touched.socialMedia?.facebook && Boolean(errors.socialMedia?.facebook)}
+                              helperText={touched.socialMedia?.facebook && errors.socialMedia?.facebook}
+                              margin="normal"
+                              disabled={!editMode}
+                              InputProps={{
+                                startAdornment: <FacebookIcon color="action" sx={{ mr: 1 }} />
+                              }}
+                            />
+                          </Grid>
+                          
+                          <Grid item xs={12} md={4}>
+                            <TextField
+                              fullWidth
+                              id="socialMedia.instagram"
+                              name="socialMedia.instagram"
+                              label="Instagram"
+                              value={values.socialMedia.instagram}
+                              onChange={handleChange}
+                              onBlur={handleBlur}
+                              error={touched.socialMedia?.instagram && Boolean(errors.socialMedia?.instagram)}
+                              helperText={touched.socialMedia?.instagram && errors.socialMedia?.instagram}
+                              margin="normal"
+                              disabled={!editMode}
+                              InputProps={{
+                                startAdornment: <InstagramIcon color="action" sx={{ mr: 1 }} />
+                              }}
+                            />
+                          </Grid>
+                          
+                          <Grid item xs={12} md={4}>
+                            <TextField
+                              fullWidth
+                              id="socialMedia.linkedin"
+                              name="socialMedia.linkedin"
+                              label="LinkedIn"
+                              value={values.socialMedia.linkedin}
+                              onChange={handleChange}
+                              onBlur={handleBlur}
+                              error={touched.socialMedia?.linkedin && Boolean(errors.socialMedia?.linkedin)}
+                              helperText={touched.socialMedia?.linkedin && errors.socialMedia?.linkedin}
+                              margin="normal"
+                              disabled={!editMode}
+                              InputProps={{
+                                startAdornment: <LinkedInIcon color="action" sx={{ mr: 1 }} />
+                              }}
+                            />
+                          </Grid>
                         </Grid>
-                        
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            id="employeesCount"
-                            name="employeesCount"
-                            label="Nombre d'employu00e9s"
-                            type="number"
-                            value={values.employeesCount}
-                            onChange={handleChange}
-                            onBlur={handleBlur}
-                            error={touched.employeesCount && Boolean(errors.employeesCount)}
-                            helperText={touched.employeesCount && errors.employeesCount}
-                            margin="normal"
-                          />
-                        </Grid>
-                      </Grid>
-                    </Paper>
-                    
-                    <Paper sx={{ p: 3, mb: 3 }}>
-                      <Typography variant="h6" gutterBottom>
-                        Ru00e9seaux sociaux
-                      </Typography>
-                      
-                      <Grid container spacing={2}>
-                        <Grid item xs={12} sm={4}>
-                          <TextField
-                            fullWidth
-                            id="socialMedia.facebook"
-                            name="socialMedia.facebook"
-                            label="Facebook"
-                            value={values.socialMedia.facebook}
-                            onChange={handleChange}
-                            onBlur={handleBlur}
-                            error={touched.socialMedia?.facebook && Boolean(errors.socialMedia?.facebook)}
-                            helperText={touched.socialMedia?.facebook && errors.socialMedia?.facebook}
-                            margin="normal"
-                          />
-                        </Grid>
-                        
-                        <Grid item xs={12} sm={4}>
-                          <TextField
-                            fullWidth
-                            id="socialMedia.instagram"
-                            name="socialMedia.instagram"
-                            label="Instagram"
-                            value={values.socialMedia.instagram}
-                            onChange={handleChange}
-                            onBlur={handleBlur}
-                            error={touched.socialMedia?.instagram && Boolean(errors.socialMedia?.instagram)}
-                            helperText={touched.socialMedia?.instagram && errors.socialMedia?.instagram}
-                            margin="normal"
-                          />
-                        </Grid>
-                        
-                        <Grid item xs={12} sm={4}>
-                          <TextField
-                            fullWidth
-                            id="socialMedia.linkedin"
-                            name="socialMedia.linkedin"
-                            label="LinkedIn"
-                            value={values.socialMedia.linkedin}
-                            onChange={handleChange}
-                            onBlur={handleBlur}
-                            error={touched.socialMedia?.linkedin && Boolean(errors.socialMedia?.linkedin)}
-                            helperText={touched.socialMedia?.linkedin && errors.socialMedia?.linkedin}
-                            margin="normal"
-                          />
-                        </Grid>
-                      </Grid>
-                    </Paper>
-                    
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                      </CardContent>
+                    </Card>
+                  )}
+                  
+                  {/* Bouton de sauvegarde */}
+                  {editMode && (
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
                       <Button
                         type="submit"
                         variant="contained"
                         color="primary"
                         disabled={isSubmitting}
-                        sx={{ mt: 2 }}
+                        startIcon={<SaveIcon />}
                       >
                         {isSubmitting ? 'Enregistrement...' : 'Enregistrer les modifications'}
                       </Button>
                     </Box>
-                  </Grid>
-                </Grid>
+                  )}
+                </Box>
               </Form>
             )}
           </Formik>

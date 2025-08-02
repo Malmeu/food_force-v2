@@ -159,7 +159,6 @@ function App() {
           {/* Routes communes pour les utilisateurs authentifiés */}
           <Route element={<PrivateRoute />}>
             <Route path="/messages" element={<MessagesPage />} />
-            <Route path="/messages/:userId" element={<MessagesPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/ratings" element={<RatingsPage />} />
             <Route path="/payments" element={<PaymentsPage />} />
