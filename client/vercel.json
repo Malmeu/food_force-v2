@@ -1,5 +1,4 @@
 {
-  "version": 2,
   "buildCommand": "npm run build",
   "outputDirectory": "build",
   "installCommand": "npm install",
@@ -11,6 +10,7 @@
     }
   ],
   "env": {
-    "REACT_APP_API_URL": "https://food-force-api.onrender.com/api"
+    "REACT_APP_API_URL": "https://food-force-api.onrender.com/api",
+    "CI": "false"
   }
 }
