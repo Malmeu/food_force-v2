@@ -37,6 +37,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import SchoolIcon from '@mui/icons-material/School';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import DateRangeIcon from '@mui/icons-material/DateRange';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -70,6 +71,7 @@ const JobDetailsPage = () => {
         
         if (response && response.data) {
           const jobData = response.data.data || response.data;
+          console.log('Données de l\'offre reçues:', JSON.stringify(jobData, null, 2));
           setJob(jobData);
           
           // Vérifier si l'utilisateur a déjà postulé à cette offre
@@ -98,14 +100,17 @@ const JobDetailsPage = () => {
               const data = await response.json();
               console.log('Réponse API candidatures:', data);
               
-              const applications = data.data || data;
-              const existingApplication = applications.find(app => app.job?._id === id || app.job === id);
-              if (existingApplication) {
-                setHasApplied(true);
-                setApplicationStatus(existingApplication.status);
+              if (data && data.data) {
+                const application = data.data.find(app => app.job?._id === id || app.job === id);
+                if (application) {
+                  setHasApplied(true);
+                  setApplicationStatus(application.status);
+                  console.log('Candidature trouvée avec statut:', application.status);
+                }
               }
             } catch (err) {
               console.error('Erreur lors de la vérification des candidatures:', err);
+              // Ne pas afficher d'erreur à l'utilisateur pour cette vérification
             }
           }
         } else {
@@ -142,29 +147,36 @@ const JobDetailsPage = () => {
       console.log('URL de soumission de candidature:', url.toString());
       
       const token = localStorage.getItem('token');
-      const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const headers = { 
+        'Accept': 'application/json', 
+        'Content-Type': 'application/json'
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      } else {
+        throw new Error('Vous devez être connecté pour postuler');
+      }
       
       const response = await fetch(url.toString(), {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          job: id
+          job: id,
+          message: 'Candidature via la plateforme FoodForce'
         })
       });
       
       if (!response.ok) {
         const textResponse = await response.text();
         console.error(`Erreur HTTP ${response.status}:`, textResponse);
-        throw new Error(`Erreur HTTP: ${response.status} - ${response.statusText}`);
+        throw new Error(`Erreur lors de la candidature: ${response.status} - ${response.statusText}`);
       }
       
       const data = await response.json();
-      console.log('Réponse API candidature:', data);
+      console.log('Réponse de candidature:', data);
       
-      // Notification automatique gérée par le backend
-      
-      toast.success('Votre candidature a été envoyée avec succès!');
+      toast.success('Votre candidature a été envoyée avec succès !');
       setHasApplied(true);
       setApplicationStatus('En attente');
       handleCloseDialog();
@@ -178,29 +190,25 @@ const JobDetailsPage = () => {
 
   if (loading) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4, textAlign: 'center' }}>
-        <CircularProgress size={60} />
-        <Typography variant="h6" sx={{ mt: 2 }}>
-          Chargement des détails de l'offre...
-        </Typography>
+      <Container sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '70vh' }}>
+        <CircularProgress />
       </Container>
     );
   }
 
   if (error) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Paper sx={{ p: 3, textAlign: 'center' }}>
+      <Container sx={{ py: 6 }}>
+        <Paper sx={{ p: 4, textAlign: 'center' }}>
           <Typography variant="h6" color="error" gutterBottom>
             {error}
           </Typography>
           <Button 
             variant="contained" 
-            startIcon={<ArrowBackIcon />}
-            onClick={() => navigate(-1)}
+            onClick={() => navigate('/jobs')}
             sx={{ mt: 2 }}
           >
-            Retour
+            Retour aux offres d'emploi
           </Button>
         </Paper>
       </Container>
@@ -209,18 +217,17 @@ const JobDetailsPage = () => {
 
   if (!job) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Paper sx={{ p: 3, textAlign: 'center' }}>
+      <Container sx={{ py: 6 }}>
+        <Paper sx={{ p: 4, textAlign: 'center' }}>
           <Typography variant="h6" gutterBottom>
             Offre d'emploi non trouvée
           </Typography>
           <Button 
             variant="contained" 
-            startIcon={<ArrowBackIcon />}
-            onClick={() => navigate(-1)}
+            onClick={() => navigate('/jobs')}
             sx={{ mt: 2 }}
           >
-            Retour
+            Retour aux offres d'emploi
           </Button>
         </Paper>
       </Container>
@@ -228,163 +235,279 @@ const JobDetailsPage = () => {
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Button 
-        variant="outlined" 
+    <Container maxWidth="lg" sx={{ py: 6 }}>
+      <Button
+        component={Link}
+        to="/jobs"
         startIcon={<ArrowBackIcon />}
-        onClick={() => navigate(-1)}
-        sx={{ mb: 3 }}
+        sx={{ 
+          mb: 4, 
+          color: 'text.primary', 
+          textTransform: 'none', 
+          fontWeight: 500,
+          '&:hover': {
+            backgroundColor: 'rgba(0, 0, 0, 0.04)'
+          }
+        }}
       >
-        Retour
+        Retour aux offres
       </Button>
       
       <Grid container spacing={4}>
-        {/* Détails de l'offre */}
+        {/* Informations principales */}
         <Grid item xs={12} md={8}>
-          <Paper sx={{ p: 3, borderRadius: 2 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-              <Box>
-                <Typography variant="h4" component="h1" gutterBottom fontWeight="bold">
+          <Card sx={{ 
+            mb: 3, 
+            borderRadius: 3, 
+            boxShadow: '0 4px 20px rgba(0,0,0,0.06)', 
+            border: '1px solid rgba(0,0,0,0.06)'
+          }}>
+            <CardContent sx={{ p: 4 }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Typography variant="h5" component="h1" sx={{ fontWeight: 800, mb: 0.5, letterSpacing: '-0.02em', fontSize: '1.8rem' }}>
                   {job.title}
                 </Typography>
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
-                  <Chip 
-                    icon={<WorkIcon />} 
-                    label={job.contractType} 
-                    variant="outlined" 
-                    color="primary" 
-                  />
-                  <Chip 
-                    icon={<LocationOnIcon />} 
-                    label={`${job.location?.city || 'Non spécifié'}`} 
-                    variant="outlined" 
-                  />
+                <Typography variant="subtitle1" color="text.secondary" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                  <BusinessIcon sx={{ fontSize: 18, mr: 1, opacity: 0.7 }} />
+                  {job.sector} • <LocationOnIcon sx={{ fontSize: 18, mx: 1, opacity: 0.7 }} /> {job.location?.city || 'Non spécifié'}
+                </Typography>
+                
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
                   <Chip 
                     icon={<AttachMoneyIcon />} 
                     label={`${job.salary?.amount || ''} ${job.salary?.currency || 'MAD'}/${job.salary?.period || 'mois'}`} 
                     variant="outlined" 
-                    color="secondary" 
+                    sx={{ fontWeight: 500, borderRadius: 10 }}
+                  />
+                  
+                  <Chip 
+                    icon={<CalendarTodayIcon />} 
+                    label={`Début: ${formatDate(job.startDate)}`} 
+                    variant="outlined" 
+                    sx={{ fontWeight: 500, borderRadius: 10 }}
+                  />
+                  
+                  {job.workingHours && job.workingHours.start && job.workingHours.end && (
+                    <Chip 
+                      icon={<AccessTimeIcon />} 
+                      label={`Horaires: ${job.workingHours.start} - ${job.workingHours.end}`} 
+                      variant="outlined" 
+                      sx={{ fontWeight: 500, borderRadius: 10 }}
+                    />
+                  )}
+                  
+                  {job.workingDays && job.workingDays.length > 0 && (
+                    <Chip 
+                      icon={<DateRangeIcon />} 
+                      label={`Jours: ${job.workingDays.join(', ')}`} 
+                      variant="outlined" 
+                      sx={{ fontWeight: 500, borderRadius: 10 }}
+                    />
+                  )}
+                  
+                  <Chip 
+                    icon={<PersonIcon />} 
+                    label={`Expérience: ${job.experienceLevel || 'Non spécifié'}`} 
+                    variant="outlined" 
+                    sx={{ fontWeight: 500, borderRadius: 10 }}
                   />
                 </Box>
               </Box>
               
-              <Box>
+              <Box sx={{ mt: 3 }}>
                 {hasApplied ? (
-                    <Chip 
-                      icon={<CheckCircleIcon />} 
-                      label={`Candidature ${applicationStatus}`} 
-                      color={applicationStatus === 'Acceptée' ? 'success' : applicationStatus === 'Refusée' ? 'error' : 'warning'} 
-                      variant="filled" 
-                      sx={{ fontWeight: 'bold' }}
-                    />
-                  ) : (
-                    <Button 
-                      variant="contained" 
-                      color="primary" 
-                      size="large"
-                      onClick={handleOpenDialog}
-                    >
-                      Postuler maintenant
-                    </Button>
-                  )}
-                </Box>
-            </Box>
-            
-            <Divider sx={{ my: 2 }} />
-            
-            <Typography variant="h6" gutterBottom fontWeight="bold">
-              Description du poste
-            </Typography>
-            <Typography variant="body1" paragraph style={{ whiteSpace: 'pre-line' }}>
-              {job.description}
-            </Typography>
-            
-            <Typography variant="h6" gutterBottom fontWeight="bold" sx={{ mt: 3 }}>
-              Compétences requises
-            </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}>
-              {job.requiredSkills && job.requiredSkills.length > 0 ? (
-                job.requiredSkills.map((skill, index) => (
-                  <Chip key={index} label={skill} variant="outlined" />
-                ))
-              ) : (
-                <Typography variant="body2" color="text.secondary">
-                  Aucune compétence spécifique mentionnée
-                </Typography>
-              )}
-            </Box>
-            
-            <Grid container spacing={2} sx={{ mt: 2 }}>
-              <Grid item xs={12} sm={6}>
-                <Card variant="outlined">
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom fontWeight="bold">
-                      Détails du contrat
-                    </Typography>
-                    <List dense>
-                      <ListItem>
-                        <ListItemIcon><WorkIcon color="primary" /></ListItemIcon>
-                        <ListItemText 
-                          primary="Type de contrat" 
-                          secondary={job.contractType || 'Non spécifié'} 
-                        />
-                      </ListItem>
-                      <ListItem>
-                        <ListItemIcon><CalendarTodayIcon color="primary" /></ListItemIcon>
-                        <ListItemText 
-                          primary="Date de début" 
-                          secondary={formatDate(job.startDate)} 
-                        />
-                      </ListItem>
-                      <ListItem>
-                        <ListItemIcon><AccessTimeIcon color="primary" /></ListItemIcon>
-                        <ListItemText 
-                          primary="Horaires de travail" 
-                          secondary={`${job.workingHours?.start || ''} - ${job.workingHours?.end || ''}`} 
-                        />
-                      </ListItem>
-                    </List>
-                  </CardContent>
-                </Card>
-              </Grid>
+                  <Chip 
+                    icon={<CheckCircleIcon />} 
+                    label={`Candidature ${applicationStatus}`} 
+                    color={applicationStatus === 'Acceptée' ? 'success' : applicationStatus === 'Refusée' ? 'error' : 'warning'} 
+                    variant="filled" 
+                    sx={{ fontWeight: 'bold', py: 0.5 }}
+                  />
+                ) : (
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    fullWidth
+                    onClick={handleOpenDialog}
+                    disabled={hasApplied}
+                    sx={{
+                      py: 1.5,
+                      mt: 2,
+                      fontWeight: 600,
+                      borderRadius: 10,
+                      textTransform: 'none',
+                      boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
+                      backgroundColor: 'primary.main',
+                      '&:hover': {
+                        backgroundColor: 'primary.dark',
+                        boxShadow: '0 6px 12px rgba(0,0,0,0.15)'
+                      }
+                    }}
+                  >
+                    Postuler maintenant
+                  </Button>
+                )}
+              </Box>
               
-              <Grid item xs={12} sm={6}>
-                <Card variant="outlined">
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom fontWeight="bold">
-                      Prérequis
-                    </Typography>
-                    <List dense>
-                      <ListItem>
-                        <ListItemIcon><PersonIcon color="primary" /></ListItemIcon>
-                        <ListItemText 
-                          primary="Expérience requise" 
-                          secondary={job.experienceLevel || 'Non spécifié'} 
-                        />
-                      </ListItem>
-                      <ListItem>
-                        <ListItemIcon><SchoolIcon color="primary" /></ListItemIcon>
-                        <ListItemText 
-                          primary="Niveau d'études" 
-                          secondary={job.educationLevel || 'Non spécifié'} 
-                        />
-                      </ListItem>
-                      <ListItem>
-                        <ListItemIcon><CalendarTodayIcon color="primary" /></ListItemIcon>
-                        <ListItemText 
-                          primary="Date limite de candidature" 
-                          secondary={formatDate(job.applicationDeadline)} 
-                        />
-                      </ListItem>
-                    </List>
-                  </CardContent>
-                </Card>
-              </Grid>
+              <Divider sx={{ my: 3 }} />
+              
+              <Typography variant="h6" gutterBottom sx={{ fontWeight: 700, color: 'text.primary', fontSize: '1.1rem', letterSpacing: '-0.01em' }}>
+                Description du poste
+              </Typography>
+              <Typography variant="body1" paragraph sx={{ whiteSpace: 'pre-line', color: 'text.secondary', lineHeight: 1.7, fontSize: '0.95rem' }}>
+                {job.description}
+              </Typography>
+              
+              <Typography variant="h6" gutterBottom sx={{ fontWeight: 700, color: 'text.primary', fontSize: '1.1rem', mt: 3, letterSpacing: '-0.01em' }}>
+                Compétences requises
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}>
+                {job.requiredSkills && job.requiredSkills.length > 0 ? (
+                  job.requiredSkills.map((skill, index) => (
+                    <Chip 
+                      key={index} 
+                      label={skill} 
+                      variant="outlined" 
+                      sx={{ 
+                        borderRadius: '16px', 
+                        fontWeight: 500, 
+                        bgcolor: 'rgba(25, 118, 210, 0.08)',
+                        border: 'none',
+                        px: 1
+                      }}
+                    />
+                  ))
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    Aucune compétence spécifique mentionnée
+                  </Typography>
+                )}
+              </Box>
+            </CardContent>
+          </Card>
+          
+          <Grid container spacing={3} sx={{ mt: 1 }}>
+            <Grid item xs={12} sm={6}>
+              <Card variant="outlined" sx={{ 
+                borderRadius: 2,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                height: '100%',
+                border: '1px solid rgba(0,0,0,0.08)'
+              }}>
+                <CardContent sx={{ p: 3 }}>
+                  <Typography variant="h6" gutterBottom sx={{ fontWeight: 700, fontSize: '1rem', color: 'text.primary', mb: 2, letterSpacing: '-0.01em' }}>
+                    Détails du contrat
+                  </Typography>
+                  <List dense sx={{ '& .MuiListItem-root': { py: 1.2 } }}>
+                    <ListItem>
+                      <ListItemIcon>
+                        <WorkIcon sx={{ color: 'primary.main', opacity: 0.8 }} />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary={<Typography variant="body2" sx={{ fontWeight: 500 }}>Type de contrat</Typography>}
+                        secondary={<Typography variant="body2" color="text.secondary">{job.contractType || '-'}</Typography>}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemIcon>
+                        <CalendarTodayIcon sx={{ color: 'primary.main', opacity: 0.8 }} />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary={<Typography variant="body2" sx={{ fontWeight: 500 }}>Période de mission</Typography>}
+                        secondary={
+                          <Typography variant="body2" color="text.secondary">
+                            {job.startDate && (
+                              job.endDate 
+                                ? `${formatDate(job.startDate)} - ${formatDate(job.endDate)}` 
+                                : `Début: ${formatDate(job.startDate)}`
+                            )}
+                          </Typography>
+                        } 
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemIcon>
+                        <AccessTimeIcon sx={{ color: 'primary.main', opacity: 0.8 }} />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary={<Typography variant="body2" sx={{ fontWeight: 500 }}>Horaires de travail</Typography>}
+                        secondary={
+                          <Typography variant="body2" color="text.secondary">
+                            {job.workingHours && job.workingHours.start && job.workingHours.end 
+                              ? `${job.workingHours.start} - ${job.workingHours.end}` 
+                              : '-'}
+                          </Typography>
+                        }
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemIcon>
+                        <DateRangeIcon sx={{ color: 'primary.main', opacity: 0.8 }} />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary={<Typography variant="body2" sx={{ fontWeight: 500 }}>Jours de travail</Typography>}
+                        secondary={<Typography variant="body2" color="text.secondary">{job.workingDays && job.workingDays.length > 0 ? job.workingDays.join(', ') : '-'}</Typography>}
+                      />
+                    </ListItem>
+                  </List>
+                </CardContent>
+              </Card>
             </Grid>
             
-            {job.benefits && job.benefits.length > 0 && (
-              <Box sx={{ mt: 3 }}>
-                <Typography variant="h6" gutterBottom fontWeight="bold">
+            <Grid item xs={12} sm={6}>
+              <Card variant="outlined" sx={{ 
+                borderRadius: 2,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                height: '100%',
+                border: '1px solid rgba(0,0,0,0.08)'
+              }}>
+                <CardContent sx={{ p: 3 }}>
+                  <Typography variant="h6" gutterBottom sx={{ fontWeight: 700, fontSize: '1rem', color: 'text.primary', mb: 2, letterSpacing: '-0.01em' }}>
+                    Prérequis
+                  </Typography>
+                  <List dense sx={{ '& .MuiListItem-root': { py: 1.2 } }}>
+                    <ListItem>
+                      <ListItemIcon>
+                        <PersonIcon sx={{ color: 'primary.main', opacity: 0.8 }} />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary={<Typography variant="body2" sx={{ fontWeight: 500 }}>Expérience requise</Typography>}
+                        secondary={<Typography variant="body2" color="text.secondary">{job.experienceLevel || '-'}</Typography>}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemIcon>
+                        <SchoolIcon sx={{ color: 'primary.main', opacity: 0.8 }} />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary={<Typography variant="body2" sx={{ fontWeight: 500 }}>Niveau d'études</Typography>}
+                        secondary={<Typography variant="body2" color="text.secondary">{job.educationLevel || '-'}</Typography>}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemIcon>
+                        <CalendarTodayIcon sx={{ color: 'primary.main', opacity: 0.8 }} />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary={<Typography variant="body2" sx={{ fontWeight: 500 }}>Date limite de candidature</Typography>}
+                        secondary={<Typography variant="body2" color="text.secondary">{job.applicationDeadline ? formatDate(job.applicationDeadline) : '-'}</Typography>}
+                      />
+                    </ListItem>
+                  </List>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+          
+          {job.benefits && job.benefits.length > 0 && (
+            <Card variant="outlined" sx={{ 
+              mt: 3, 
+              borderRadius: 2, 
+              boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+              border: '1px solid rgba(0,0,0,0.08)'
+            }}>
+              <CardContent sx={{ p: 3 }}>
+                <Typography variant="h6" gutterBottom sx={{ fontWeight: 700, fontSize: '1rem', color: 'text.primary', mb: 2, letterSpacing: '-0.01em' }}>
                   Avantages
                 </Typography>
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
@@ -393,62 +516,74 @@ const JobDetailsPage = () => {
                       key={index} 
                       label={benefit} 
                       variant="outlined" 
-                      color="success" 
-                      icon={<CheckCircleIcon />} 
+                      sx={{ 
+                        borderRadius: '16px', 
+                        fontWeight: 500,
+                        bgcolor: 'rgba(76, 175, 80, 0.08)',
+                        border: 'none'
+                      }}
                     />
                   ))}
                 </Box>
-              </Box>
-            )}
-          </Paper>
+              </CardContent>
+            </Card>
+          )}
         </Grid>
         
-        {/* Informations supplémentaires */}
+        {/* Informations complémentaires */}
         <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 3, borderRadius: 2 }}>
-            <Typography variant="h6" gutterBottom fontWeight="bold">
-              Informations supplémentaires
-            </Typography>
-            <List dense>
-              <ListItem>
-                <ListItemIcon><CalendarTodayIcon color="primary" /></ListItemIcon>
-                <ListItemText 
-                  primary="Date de publication" 
-                  secondary={formatDate(job.createdAt)} 
-                />
-              </ListItem>
-              <ListItem>
-                <ListItemIcon><PersonIcon color="primary" /></ListItemIcon>
-                <ListItemText 
-                  primary="Postes disponibles" 
-                  secondary={job.numberOfPositions || '1'} 
-                />
-              </ListItem>
-              <ListItem>
-                <ListItemIcon><BusinessIcon color="primary" /></ListItemIcon>
-                <ListItemText 
-                  primary="Secteur d'activité" 
-                  secondary={job.sector || 'Non spécifié'} 
-                />
-              </ListItem>
-            </List>
-          </Paper>
+          <Card variant="outlined" sx={{ 
+            borderRadius: 2, 
+            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+            border: '1px solid rgba(0,0,0,0.08)'
+          }}>
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="h6" gutterBottom sx={{ fontWeight: 700, fontSize: '1rem', color: 'text.primary', mb: 2, letterSpacing: '-0.01em' }}>
+                Informations complémentaires
+              </Typography>
+              <List dense sx={{ '& .MuiListItem-root': { py: 1 } }}>
+                <ListItem>
+                  <ListItemText 
+                    primary={<Typography variant="body2" sx={{ fontWeight: 500 }}>Date limite de candidature</Typography>}
+                    secondary={<Typography variant="body2" color="text.secondary">{job.applicationDeadline ? formatDate(job.applicationDeadline) : '-'}</Typography>}
+                  />
+                </ListItem>
+                <ListItem>
+                  <ListItemText 
+                    primary={<Typography variant="body2" sx={{ fontWeight: 500 }}>Nombre de postes</Typography>}
+                    secondary={<Typography variant="body2" color="text.secondary">{job.vacancies || 1}</Typography>}
+                  />
+                </ListItem>
+                <ListItem>
+                  <ListItemText 
+                    primary={<Typography variant="body2" sx={{ fontWeight: 500 }}>Date de publication</Typography>}
+                    secondary={<Typography variant="body2" color="text.secondary">{formatDate(job.createdAt)}</Typography>}
+                  />
+                </ListItem>
+              </List>
+            </CardContent>
+          </Card>
         </Grid>
       </Grid>
       
-      {/* Dialogue de candidature */}
+      {/* Dialog de confirmation */}
       <Dialog open={openDialog} onClose={handleCloseDialog}>
-        <DialogTitle>Postuler à cette offre</DialogTitle>
+        <DialogTitle>Confirmer votre candidature</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Vous êtes sur le point de postuler à l'offre "{job?.title}". Confirmez-vous votre candidature ?
+            Êtes-vous sûr de vouloir postuler à cette offre d'emploi ? Votre profil sera partagé avec l'employeur.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog} color="primary">
+          <Button onClick={handleCloseDialog} disabled={applying}>
             Annuler
           </Button>
-          <Button onClick={handleApply} color="primary" disabled={applying}>
+          <Button 
+            onClick={handleApply} 
+            color="primary" 
+            variant="contained"
+            disabled={applying}
+          >
             {applying ? <CircularProgress size={24} /> : 'Confirmer'}
           </Button>
         </DialogActions>

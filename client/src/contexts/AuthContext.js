@@ -276,10 +276,40 @@ export const AuthProvider = ({ children }) => {
   };
 
   const updateProfile = (userData) => {
-    // Mettre u00e0 jour l'utilisateur dans le state et le cache
-    const updatedUser = { ...user, ...userData };
+    console.log('Mise à jour du profil dans le contexte avec données:', userData);
+    
+    // Fonction pour fusion profonde des objets
+    const deepMerge = (target, source) => {
+      if (!source) return target;
+      
+      const output = { ...target };
+      
+      Object.keys(source).forEach(key => {
+        if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+          // Si la propriété existe dans la cible et est aussi un objet, fusion récursive
+          if (target[key] && typeof target[key] === 'object' && !Array.isArray(target[key])) {
+            output[key] = deepMerge(target[key], source[key]);
+          } else {
+            // Sinon, copier l'objet source
+            output[key] = { ...source[key] };
+          }
+        } else {
+          // Pour les valeurs primitives ou tableaux, remplacer directement
+          output[key] = source[key];
+        }
+      });
+      
+      return output;
+    };
+    
+    // Mettre à jour l'utilisateur avec fusion profonde
+    const updatedUser = deepMerge(user, userData);
+    console.log('Utilisateur après fusion profonde:', updatedUser);
+    
+    // Mettre à jour l'état et le stockage local
     setUser(updatedUser);
     localStorage.setItem('user', JSON.stringify(updatedUser));
+    
     return updatedUser;
   };
 

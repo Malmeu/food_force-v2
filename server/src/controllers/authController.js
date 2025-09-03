@@ -190,15 +190,18 @@ exports.login = async (req, res) => {
 
     // Créer un token
     const token = generateToken(user._id);
-
+    
+    // Récupérer les données complètes de l'utilisateur sans le mot de passe
+    const userData = await User.findById(user._id);
+    const userObject = userData.toObject();
+    delete userObject.password;
+    
+    console.log('Données utilisateur complètes renvoyées lors de la connexion');
+    
     res.status(200).json({
       success: true,
       token,
-      user: {
-        id: user._id,
-        email: user.email,
-        userType: user.userType
-      }
+      user: userObject
     });
   } catch (error) {
     res.status(500).json({

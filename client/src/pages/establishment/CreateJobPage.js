@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Container, Typography, Box, Paper, TextField, Button, FormControl, 
   InputLabel, Select, MenuItem, Chip, CircularProgress, Alert, Grid, 
@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from '../../contexts/AuthContext';
 import { jobsAPI } from '../../utils/api';
+import PaymentModal from '../../components/payment/PaymentModal';
 
 const CreateJobPage = () => {
   const { user } = useAuth();
@@ -18,6 +19,8 @@ const CreateJobPage = () => {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
   const [activeStep, setActiveStep] = useState(0);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [jobDataToSubmit, setJobDataToSubmit] = useState(null);
   const theme = useTheme();
   
   // Étapes du formulaire
@@ -158,25 +161,16 @@ const CreateJobPage = () => {
       };
 
       console.log('Données de l\'offre formatées:', jobData);
-
-      // Envoi des données à l'API en utilisant jobsAPI
-      const response = await jobsAPI.createJob(jobData);
-      console.log('Réponse de l\'API:', response.data);
       
-      if (!response.data) {
-        throw new Error('Erreur lors de la création de l\'offre');
-      }
+      // Au lieu d'envoyer directement à l'API, on stocke les données et on ouvre la modal de paiement
+      setJobDataToSubmit(jobData);
+      setShowPaymentModal(true);
       
-      // Affichage d'un message de succès
-      setSuccess(true);
-      toast.success('Offre d\'emploi créée avec succès!');
-      resetForm();
-      setActiveStep(0);
     } catch (err) {
-      console.error('Erreur lors de la création de l\'offre:', err);
+      console.error('Erreur lors de la préparation de l\'offre:', err);
       
       // Gestion simplifiée des erreurs
-      let errorMessage = 'Une erreur est survenue lors de la création de l\'offre.';
+      let errorMessage = 'Une erreur est survenue lors de la préparation de l\'offre.';
       
       if (err.message) {
         errorMessage = err.message;
@@ -186,6 +180,56 @@ const CreateJobPage = () => {
       toast.error(errorMessage);
     } finally {
       setSubmitting(false);
+    }
+  };
+  
+  // Fonction appelée après un paiement réussi
+  const handlePaymentSuccess = async (plan) => {
+    try {
+      if (!jobDataToSubmit) {
+        throw new Error('Données de l\'offre non disponibles');
+      }
+      
+      // Ajout des informations de forfait aux données de l'offre
+      const jobDataWithSubscription = {
+        ...jobDataToSubmit,
+        subscription: {
+          plan: plan.id,
+          price: plan.price,
+          duration: plan.duration,
+          purchasedAt: new Date()
+        }
+      };
+      
+      // Envoi des données à l'API
+      const response = await jobsAPI.createJob(jobDataWithSubscription);
+      console.log('Réponse de l\'API après paiement:', response.data);
+      
+      if (!response.data) {
+        throw new Error('Erreur lors de la création de l\'offre');
+      }
+      
+      // Affichage d'un message de succès
+      setSuccess(true);
+      toast.success('Offre d\'emploi publiée avec succès!');
+      
+      // Réinitialiser le formulaire et revenir à l'étape 1
+      setTimeout(() => {
+        setActiveStep(0);
+        navigate('/establishment/jobs');
+      }, 2000);
+      
+    } catch (err) {
+      console.error('Erreur lors de la création de l\'offre après paiement:', err);
+      
+      let errorMessage = 'Une erreur est survenue lors de la publication de l\'offre.';
+      
+      if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+      toast.error(errorMessage);
     }
   };
 
@@ -235,62 +279,70 @@ const CreateJobPage = () => {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Paper sx={{ p: 4, backgroundColor: alpha(theme.palette.background.paper, 0.9) }}>
-        <Typography variant="h4" gutterBottom align="center" sx={{ fontWeight: 'bold', color: theme.palette.primary.main, mb: 3 }}>
-          Créer une offre d'emploi
-        </Typography>
-        
-        {success && (
-          <Alert severity="success" sx={{ mb: 3 }}>
-            Offre d'emploi créée avec succès!
-          </Alert>
-        )}
-        
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
-            {error}
-          </Alert>
-        )}
-        
-        <Box sx={{ mb: 4 }}>
-          <Stepper activeStep={activeStep} alternativeLabel>
-            {steps.map((step, index) => (
-              <Step key={step.label}>
-                <StepButton onClick={() => handleStepClick(index)}>
-                  <StepLabel>{step.label}</StepLabel>
-                </StepButton>
-              </Step>
-            ))}
-          </Stepper>
-        </Box>
-        
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="subtitle1" color="text.secondary" align="center">
-            {steps[activeStep].description}
+    <Container maxWidth="md" sx={{ py: 4 }}>
+      <Paper elevation={3} sx={{ p: 0, borderRadius: 2, overflow: 'hidden' }}>
+        {/* Modal de paiement */}
+        <PaymentModal 
+          open={showPaymentModal} 
+          onClose={() => setShowPaymentModal(false)} 
+          onSuccess={handlePaymentSuccess}
+          jobData={jobDataToSubmit}
+        />
+        <Box sx={{ p: 3 }}>
+          <Typography variant="h4" gutterBottom align="center" sx={{ fontWeight: 'bold', color: theme.palette.primary.main, mb: 3 }}>
+            Créer une offre d'emploi
           </Typography>
-        </Box>
+          
+          {success && (
+            <Alert severity="success" sx={{ mb: 3 }}>
+              Offre d'emploi créée avec succès!
+            </Alert>
+          )}
         
-        <Card sx={{ p: 3, boxShadow: 3, borderRadius: 2 }}>
-          <Formik
-            initialValues={initialValues}
-            validationSchema={validationSchema}
-            onSubmit={handleSubmit}
-          >
-            {({
-              values,
-              errors,
-              touched,
-              handleChange,
-              handleBlur,
-              handleSubmit,
-              isSubmitting,
-              setFieldValue,
-              resetForm
-            }) => (
-              <Form>
-                {/* Étape 1: Informations générales */}
-                {activeStep === 0 && (
+          {error && (
+            <Alert severity="error" sx={{ mb: 3 }}>
+              {error}
+            </Alert>
+          )}
+          
+          <Box sx={{ mb: 4 }}>
+            <Stepper activeStep={activeStep} alternativeLabel>
+              {steps.map((step, index) => (
+                <Step key={step.label}>
+                  <StepButton onClick={() => handleStepClick(index)}>
+                    <StepLabel>{step.label}</StepLabel>
+                  </StepButton>
+                </Step>
+              ))}
+            </Stepper>
+          </Box>
+          
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="subtitle1" color="text.secondary" align="center">
+              {steps[activeStep].description}
+            </Typography>
+          </Box>
+          
+          <Card sx={{ p: 3, boxShadow: 3, borderRadius: 2 }}>
+            <Formik
+              initialValues={initialValues}
+              validationSchema={validationSchema}
+              onSubmit={handleSubmit}
+            >
+              {({
+                values,
+                errors,
+                touched,
+                handleChange,
+                handleBlur,
+                handleSubmit,
+                isSubmitting,
+                setFieldValue,
+                resetForm
+              }) => (
+                <Form>
+                  {/* Étape 1: Informations générales */}
+                  {activeStep === 0 && (
                   <Box>
                     <Typography variant="h6" gutterBottom sx={{ color: theme.palette.primary.main }}>
                       Informations générales
@@ -525,6 +577,12 @@ const CreateJobPage = () => {
                           </Box>
                         </Box>
                       </Grid>
+                      <Grid item xs={12}>
+                        <Typography variant="subtitle1" gutterBottom sx={{ mt: 2 }}>
+                          Période de la mission
+                        </Typography>
+                      </Grid>
+                      
                       <Grid item xs={12} sm={6}>
                         <TextField
                           fullWidth
@@ -537,6 +595,23 @@ const CreateJobPage = () => {
                           onBlur={handleBlur}
                           error={touched.startDate && Boolean(errors.startDate)}
                           helperText={touched.startDate && errors.startDate}
+                          margin="normal"
+                          InputLabelProps={{ shrink: true }}
+                        />
+                      </Grid>
+                      
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          id="endDate"
+                          name="endDate"
+                          label="Date de fin"
+                          type="date"
+                          value={values.endDate}
+                          onChange={handleChange}
+                          onBlur={handleBlur}
+                          error={touched.endDate && Boolean(errors.endDate)}
+                          helperText={touched.endDate && errors.endDate}
                           margin="normal"
                           InputLabelProps={{ shrink: true }}
                         />
@@ -562,6 +637,148 @@ const CreateJobPage = () => {
                             <FormHelperText>{errors.experienceLevel}</FormHelperText>
                           )}
                         </FormControl>
+                      </Grid>
+                      
+                      <Grid item xs={12}>
+                        <Typography variant="subtitle1" gutterBottom sx={{ mt: 2 }}>
+                          Horaires de travail
+                        </Typography>
+                      </Grid>
+                      
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          id="workingHours.start"
+                          name="workingHours.start"
+                          label="Heure de début"
+                          type="time"
+                          value={values.workingHours.start}
+                          onChange={handleChange}
+                          onBlur={handleBlur}
+                          margin="normal"
+                          InputLabelProps={{ shrink: true }}
+                        />
+                      </Grid>
+                      
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          id="workingHours.end"
+                          name="workingHours.end"
+                          label="Heure de fin"
+                          type="time"
+                          value={values.workingHours.end}
+                          onChange={handleChange}
+                          onBlur={handleBlur}
+                          margin="normal"
+                          InputLabelProps={{ shrink: true }}
+                        />
+                      </Grid>
+                      
+                      <Grid item xs={12}>
+                        <Typography variant="subtitle1" gutterBottom sx={{ mt: 2 }}>
+                          Jours de travail
+                        </Typography>
+                        <FormGroup row>
+                          <FormControlLabel
+                            control={
+                              <Checkbox
+                                checked={values.workingDays.includes('Lundi')}
+                                onChange={(e) => {
+                                  const newWorkingDays = e.target.checked
+                                    ? [...values.workingDays, 'Lundi']
+                                    : values.workingDays.filter(day => day !== 'Lundi');
+                                  setFieldValue('workingDays', newWorkingDays);
+                                }}
+                              />
+                            }
+                            label="Lundi"
+                          />
+                          <FormControlLabel
+                            control={
+                              <Checkbox
+                                checked={values.workingDays.includes('Mardi')}
+                                onChange={(e) => {
+                                  const newWorkingDays = e.target.checked
+                                    ? [...values.workingDays, 'Mardi']
+                                    : values.workingDays.filter(day => day !== 'Mardi');
+                                  setFieldValue('workingDays', newWorkingDays);
+                                }}
+                              />
+                            }
+                            label="Mardi"
+                          />
+                          <FormControlLabel
+                            control={
+                              <Checkbox
+                                checked={values.workingDays.includes('Mercredi')}
+                                onChange={(e) => {
+                                  const newWorkingDays = e.target.checked
+                                    ? [...values.workingDays, 'Mercredi']
+                                    : values.workingDays.filter(day => day !== 'Mercredi');
+                                  setFieldValue('workingDays', newWorkingDays);
+                                }}
+                              />
+                            }
+                            label="Mercredi"
+                          />
+                          <FormControlLabel
+                            control={
+                              <Checkbox
+                                checked={values.workingDays.includes('Jeudi')}
+                                onChange={(e) => {
+                                  const newWorkingDays = e.target.checked
+                                    ? [...values.workingDays, 'Jeudi']
+                                    : values.workingDays.filter(day => day !== 'Jeudi');
+                                  setFieldValue('workingDays', newWorkingDays);
+                                }}
+                              />
+                            }
+                            label="Jeudi"
+                          />
+                          <FormControlLabel
+                            control={
+                              <Checkbox
+                                checked={values.workingDays.includes('Vendredi')}
+                                onChange={(e) => {
+                                  const newWorkingDays = e.target.checked
+                                    ? [...values.workingDays, 'Vendredi']
+                                    : values.workingDays.filter(day => day !== 'Vendredi');
+                                  setFieldValue('workingDays', newWorkingDays);
+                                }}
+                              />
+                            }
+                            label="Vendredi"
+                          />
+                          <FormControlLabel
+                            control={
+                              <Checkbox
+                                checked={values.workingDays.includes('Samedi')}
+                                onChange={(e) => {
+                                  const newWorkingDays = e.target.checked
+                                    ? [...values.workingDays, 'Samedi']
+                                    : values.workingDays.filter(day => day !== 'Samedi');
+                                  setFieldValue('workingDays', newWorkingDays);
+                                }}
+                              />
+                            }
+                            label="Samedi"
+                          />
+                          <FormControlLabel
+                            control={
+                              <Checkbox
+                                checked={values.workingDays.includes('Dimanche')}
+                                onChange={(e) => {
+                                  const newWorkingDays = e.target.checked
+                                    ? [...values.workingDays, 'Dimanche']
+                                    : values.workingDays.filter(day => day !== 'Dimanche');
+                                  setFieldValue('workingDays', newWorkingDays);
+                                }}
+                              />
+                            }
+                            label="Dimanche"
+                          />
+                        </FormGroup>
                       </Grid>
                     </Grid>
                   </Box>
@@ -643,10 +860,11 @@ const CreateJobPage = () => {
                     )}
                   </Box>
                 </Box>
-              </Form>
-            )}
-          </Formik>
-        </Card>
+                </Form>
+              )}
+            </Formik>
+          </Card>
+        </Box>
       </Paper>
     </Container>
   );

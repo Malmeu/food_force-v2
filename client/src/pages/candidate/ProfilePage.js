@@ -2,13 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Container, Grid, Paper, Typography, TextField, Button, Box, Avatar, Chip, Divider, Alert, CircularProgress } from '@mui/material';
 import { Formik, Form, Field } from 'formik';
 import * as Yup from 'yup';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import EditIcon from '@mui/icons-material/Edit';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import SchoolIcon from '@mui/icons-material/School';
 import WorkIcon from '@mui/icons-material/Work';
 import { useAuth } from '../../contexts/AuthContext';
-import { userAPI, authAPI } from '../../utils/api';
+import { usersAPI as userAPI, authAPI } from '../../utils/api';
 
 const ProfilePage = () => {
   const { user, updateProfile } = useAuth();
@@ -17,11 +16,6 @@ const ProfilePage = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [editMode, setEditMode] = useState(false);
-  const [uploadedFile, setUploadedFile] = useState(null);
-  const [uploadedFileName, setUploadedFileName] = useState('');
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState('');
-  const [uploadSuccess, setUploadSuccess] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -31,80 +25,77 @@ const ProfilePage = () => {
         
         if (!user || !user.id) {
           console.error('Aucun utilisateur ou ID utilisateur non disponible');
-          throw new Error('Utilisateur non authentifié');
+          setLoading(false);
+          setError('Utilisateur non authentifié');
+          return;
         }
         
         // Récupérer les données de l'utilisateur courant
-        const response = await authAPI.getCurrentUser();
-        
-        console.log('Réponse du profil reçue:', response);
-        
-        if (response && response.data) {
-          // Extraire les données du profil de la réponse
-          const profileData = response.data.data || response.data;
-          console.log('Données du profil extraites:', profileData);
+        console.log('Tentative d\'appel à authAPI.getCurrentUser()');
+        try {
+          const response = await authAPI.getCurrentUser();
+          console.log('Réponse du profil reçue:', response);
           
-          // Vérifier que les données du profil candidat existent
-          if (!profileData.candidateProfile) {
-            console.error('Profil candidat manquant dans les données:', profileData);
+          if (response && response.data) {
+            // Extraire les données du profil de la réponse
+            const profileData = response.data.data || response.data;
+            console.log('Données du profil extraites:', profileData);
             
-            // Si le profil candidat n'existe pas, utiliser directement les données de l'utilisateur
-            // Cela permet d'afficher les informations même si elles ne sont pas dans un sous-objet candidateProfile
-            const displayData = {
-              ...profileData,
-              firstName: profileData.firstName || '',
-              lastName: profileData.lastName || '',
-              bio: profileData.bio || '',
-              education: profileData.education || '',
-              experienceLevel: profileData.experienceLevel || '',
-              skills: profileData.skills || [],
-              preferredSectors: profileData.preferredSectors || [],
-              preferredContractTypes: profileData.preferredContractTypes || []
-            };
+            // Vérifier que les données du profil candidat existent
+            if (!profileData.candidateProfile) {
+              console.error('Profil candidat manquant dans les données:', profileData);
+              
+              // Si le profil candidat n'existe pas, utiliser directement les données de l'utilisateur
+              // Cela permet d'afficher les informations même si elles ne sont pas dans un sous-objet candidateProfile
+              const displayData = {
+                ...profileData,
+                firstName: profileData.firstName || '',
+                lastName: profileData.lastName || '',
+                bio: profileData.bio || '',
+                education: profileData.education || '',
+                experienceLevel: profileData.experienceLevel || '',
+                skills: profileData.skills || [],
+                preferredSectors: profileData.preferredSectors || [],
+                preferredContractTypes: profileData.preferredContractTypes || []
+              };
+              
+              console.log('Données formatées pour l\'affichage (sans candidateProfile):', displayData);
+              setProfileData(displayData);
+            } else {
+              // Si le profil candidat existe, fusionner les données
+              const displayData = {
+                ...profileData,
+                ...profileData.candidateProfile
+              };
+              
+              console.log('Données formatées pour l\'affichage (avec candidateProfile):', displayData);
+              setProfileData(displayData);
+            }
             
-            console.log('Données formatées pour l\'affichage (sans candidateProfile):', displayData);
-            setProfileData(displayData);
             setError('');
-            setLoading(false);
-            return;
+          } else {
+            throw new Error('Données de profil non disponibles');
           }
-          
-          // Préparer les données pour l'affichage en combinant les deux niveaux
-          const displayData = {
-            ...profileData,
-            // Ajouter les champs du profil candidat au niveau supérieur pour faciliter l'accès
-            ...(profileData.candidateProfile || {})
-          };
-          
-          console.log('Données formatées pour l\'affichage:', displayData);
-          setProfileData(displayData);
-          setError('');
-        } else {
-          throw new Error('Format de réponse inattendu');
+        } catch (err) {
+          console.error('Erreur lors de l\'appel à getCurrentUser:', err);
+          setError('Impossible de récupérer les données du profil. Veuillez réessayer plus tard.');
         }
       } catch (err) {
-        console.error('Erreur lors du chargement du profil:', err);
-        setError('Impossible de charger votre profil. Veuillez réessayer plus tard.');
+        console.error('Erreur lors de la récupération du profil:', err);
+        setError('Impossible de récupérer votre profil. Veuillez réessayer plus tard.');
       } finally {
         setLoading(false);
       }
     };
-
-    if (user) {
+    
+    if (user && user.id) {
       fetchProfile();
     } else {
+      console.log('Pas d\'utilisateur connecté, impossible de récupérer le profil');
       setLoading(false);
     }
   }, [user]);
 
-  const handleFileChange = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      setUploadedFile(file);
-      setUploadedFileName(file.name);
-      setUploadError('');
-    }
-  };
 
   const handleSubmit = async (values, { setSubmitting }) => {
     try {
@@ -173,54 +164,7 @@ const ProfilePage = () => {
     }
   };
 
-  const handleUpload = async () => {
-    if (!uploadedFile) {
-      setUploadError('Veuillez sélectionner un fichier');
-      return;
-    }
-    
-    try {
-      setUploading(true);
-      setUploadError('');
-      
-      const formData = new FormData();
-      formData.append('cv', uploadedFile);
-      
-      const response = await userAPI.uploadCV(formData);
-      console.log('Réponse du téléversement du CV:', response);
-      
-      if (response && response.data && (response.data.success || response.status === 200)) {
-        setUploadSuccess(true);
-        setUploadError('');
-        
-        // Rafraîchir les données du profil
-        const updatedProfileResponse = await authAPI.getCurrentUser();
-        if (updatedProfileResponse && updatedProfileResponse.data) {
-          const updatedProfileData = updatedProfileResponse.data.data || updatedProfileResponse.data;
-          const displayData = {
-            ...updatedProfileData,
-            ...(updatedProfileData.candidateProfile || {})
-          };
-          setProfileData(displayData);
-        }
-        
-        // Masquer le message de succès après 3 secondes
-        setTimeout(() => {
-          setUploadSuccess(false);
-          setUploadedFileName('');
-          setUploadedFile(null);
-        }, 3000);
-      } else {
-        throw new Error('Échec du téléversement du CV');
-      }
-    } catch (err) {
-      console.error('Erreur lors du téléversement du CV:', err);
-      setUploadError('Impossible de téléverser votre CV. Veuillez réessayer plus tard.');
-      setUploadSuccess(false);
-    } finally {
-      setUploading(false);
-    }
-  };
+
 
   const validationSchema = Yup.object({
     firstName: Yup.string().required('Le prénom est requis'),
@@ -352,80 +296,6 @@ const ProfilePage = () => {
               </Box>
               
               <Divider sx={{ width: '100%', my: 2 }} />
-              
-              <Box sx={{ width: '100%', mb: 2 }}>
-                <Typography variant="subtitle1" gutterBottom>
-                  CV / Resume
-                </Typography>
-                
-                {profileData?.cv ? (
-                  <Box>
-                    <Button 
-                      variant="outlined" 
-                      component="a"
-                      href={profileData.cv}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      fullWidth
-                      sx={{ mb: 1 }}
-                    >
-                      Voir mon CV
-                    </Button>
-                  </Box>
-                ) : (
-                  <Typography variant="body2" color="text.secondary">
-                    Aucun CV téléversé
-                  </Typography>
-                )}
-                
-                <Box sx={{ mt: 2 }}>
-                  <Button
-                    component="label"
-                    variant="contained"
-                    startIcon={<CloudUploadIcon />}
-                    sx={{ mb: 1 }}
-                    fullWidth
-                  >
-                    Téléverser un CV
-                    <input
-                      type="file"
-                      hidden
-                      accept=".pdf,.doc,.docx"
-                      onChange={handleFileChange}
-                    />
-                  </Button>
-                  
-                  {uploadedFileName && (
-                    <Box sx={{ mt: 1 }}>
-                      <Typography variant="body2">
-                        Fichier sélectionné: {uploadedFileName}
-                      </Typography>
-                      <Button
-                        variant="contained"
-                        color="primary"
-                        onClick={handleUpload}
-                        disabled={uploading}
-                        fullWidth
-                        sx={{ mt: 1 }}
-                      >
-                        {uploading ? <CircularProgress size={24} /> : 'Enregistrer'}
-                      </Button>
-                    </Box>
-                  )}
-                  
-                  {uploadError && (
-                    <Alert severity="error" sx={{ mt: 1 }}>
-                      {uploadError}
-                    </Alert>
-                  )}
-                  
-                  {uploadSuccess && (
-                    <Alert severity="success" sx={{ mt: 1 }}>
-                      CV téléversé avec succès
-                    </Alert>
-                  )}
-                </Box>
-              </Box>
             </Box>
           </Paper>
         </Grid>

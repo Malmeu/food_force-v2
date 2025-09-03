@@ -8,7 +8,7 @@ import { toast } from 'react-toastify';
 import { Formik, Form, Field } from 'formik';
 import * as Yup from 'yup';
 import { useAuth } from '../../contexts/AuthContext';
-import { userAPI } from '../../utils/api';
+import { usersAPI as userAPI } from '../../utils/api';
 
 // Icons
 import EditIcon from '@mui/icons-material/Edit';
@@ -120,21 +120,21 @@ const ProfilePage = () => {
 
   const handleSubmit = async (values, { setSubmitting }) => {
     try {
-      console.log('Du00e9but de la mise u00e0 jour du profil');
+      console.log('Début de la mise à jour du profil');
       
-      // Vu00e9rifier l'authentification
+      // Vérifier l'authentification
       const token = localStorage.getItem('token');
       console.log('Token d\'authentification:', token ? `${token.substring(0, 15)}...` : 'Absent');
       
       if (!token) {
-        const errMsg = 'Vous n\'u00eates pas connectu00e9. Veuillez vous connecter pour mettre u00e0 jour votre profil.';
+        const errMsg = 'Vous n\'êtes pas connecté. Veuillez vous connecter pour mettre à jour votre profil.';
         console.error(errMsg);
         setError(errMsg);
         setSubmitting(false);
         return;
       }
       
-      // Pru00e9parer les donnu00e9es du profil en fonction de la structure attendue par le modu00e8le MongoDB
+      // Préparer les données du profil en fonction de la structure attendue par le modèle MongoDB
       const profileData = {
         phone: values.phone,
         address: {
@@ -147,10 +147,10 @@ const ProfilePage = () => {
           name: values.establishmentName,
           description: values.description,
           website: values.website,
-          sector: values.sectors[0] || 'Restaurant',  // Le modu00e8le attend une chau00eene, pas un tableau et doit être une des valeurs de l'enum
-          servesAlcohol: values.servesAlcohol, // Utiliser la valeur du switch
-          companySize: values.employeesCount.toString(),
-          foundedYear: parseInt(values.foundedYear),
+          sector: values.sectors[0] || 'Restaurant',  // Le modèle attend une chaîne, pas un tableau
+          servesAlcohol: values.servesAlcohol, 
+          companySize: values.employeesCount ? values.employeesCount.toString() : '',
+          foundedYear: values.foundedYear ? parseInt(values.foundedYear) : null,
           socialMedia: {
             facebook: values.socialMedia.facebook || '',
             linkedin: values.socialMedia.linkedin || '',
@@ -158,8 +158,8 @@ const ProfilePage = () => {
             twitter: ''
           },
           contactPerson: {
-            firstName: values.contactPerson.split(' ')[0] || '',
-            lastName: values.contactPerson.split(' ').slice(1).join(' ') || '',
+            firstName: values.contactPerson ? values.contactPerson.split(' ')[0] || '' : '',
+            lastName: values.contactPerson ? values.contactPerson.split(' ').slice(1).join(' ') || '' : '',
             position: values.contactPosition || '',
             email: values.email || '',
             phone: values.phone || ''
@@ -168,32 +168,34 @@ const ProfilePage = () => {
         }
       };
 
-      console.log('Donnu00e9es envoyu00e9es pour mise u00e0 jour du profil:', JSON.stringify(profileData, null, 2));
+      console.log('Données envoyées pour mise à jour du profil:', JSON.stringify(profileData, null, 2));
 
-      // Appel API pour mettre u00e0 jour le profil avec gestion d'erreur amu00e9lioru00e9e
+      // Appel API pour mettre à jour le profil
       try {
-        console.log('Envoi de la requ00eate de mise u00e0 jour du profil...');
+        console.log('Envoi de la requête de mise à jour du profil...');
         const response = await userAPI.updateProfile(profileData);
-        console.log('Ru00e9ponse de l\'API:', response);
+        console.log('Réponse de l\'API:', response);
         
         if (response && response.data && response.data.success) {
-          console.log('Mise u00e0 jour du profil ru00e9ussie !');
+          console.log('Mise à jour du profil réussie !');
           setSuccess(true);
           setError('');
+          setEditMode(false); // Désactiver le mode édition après sauvegarde réussie
           
-          // Mettre u00e0 jour le contexte d'authentification
+          // Mettre à jour le contexte d'authentification et les données locales
           if (response.data.data) {
             updateAuthProfile(response.data.data);
+            setUserData(response.data.data); // Mettre à jour les données locales
           }
           
-          toast.success('Profil mis u00e0 jour avec succu00e8s');
+          toast.success('Profil mis à jour avec succès');
         } else {
-          throw new Error(response?.data?.message || 'Format de ru00e9ponse inattendu');
+          throw new Error(response?.data?.message || 'Format de réponse inattendu');
         }
       } catch (apiError) {
-        console.error('Erreur lors de la mise u00e0 jour du profil:', apiError);
-        setError(apiError.message || 'Erreur lors de la mise u00e0 jour du profil');
-        toast.error('Erreur lors de la mise u00e0 jour du profil');
+        console.error('Erreur lors de la mise à jour du profil:', apiError);
+        setError(apiError.message || 'Erreur lors de la mise à jour du profil');
+        toast.error('Erreur lors de la mise à jour du profil');
       }
     } catch (err) {
       console.error('Erreur globale:', err);
