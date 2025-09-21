@@ -28,32 +28,36 @@ connectDB();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Configuration CORS selon la documentation recommandée
-const allowedOrigins = [
-  'https://food-force-v2-finale.vercel.app', // Production
-  'http://localhost:3000', // Développement local
-  'http://localhost:3001'  // Développement local alternatif
-];
-
+// Configuration CORS d'urgence - Très permissive pour diagnostiquer
 const corsOptions = {
-  origin: function (origin, callback) {
-    // Autorise les requêtes sans origin (mobile apps, Postman)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: true, // Autorise toutes les origines temporairement
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  optionsSuccessStatus: 200 // Pour les anciens navigateurs
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  optionsSuccessStatus: 200,
+  preflightContinue: false
 };
 
 // Middlewares
 app.use(cors(corsOptions));
+
+// Middleware CORS manuel en backup
+app.use((req, res, next) => {
+  console.log(`CORS Debug: ${req.method} ${req.url} from ${req.headers.origin}`);
+  
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+  
+  if (req.method === 'OPTIONS') {
+    console.log('Handling preflight request');
+    res.header('Access-Control-Max-Age', '86400');
+    return res.status(200).end();
+  }
+  
+  next();
+});
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -82,6 +86,24 @@ app.use('/api/workhours', workHoursRoutes);
 // Route de base
 app.get('/', (req, res) => {
   res.send('Bienvenue sur l\'API FoodForce Maroc');
+});
+
+// Route de test CORS
+app.get('/api/test-cors', (req, res) => {
+  res.json({ 
+    message: 'CORS fonctionne !', 
+    origin: req.headers.origin,
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.post('/api/test-cors', (req, res) => {
+  res.json({ 
+    message: 'POST CORS fonctionne !', 
+    origin: req.headers.origin,
+    body: req.body,
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Middleware de gestion des erreurs
