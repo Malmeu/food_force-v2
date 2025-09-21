@@ -179,32 +179,21 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       setError(null);
       
-      // Utiliser axios au lieu de fetch pour une meilleure gestion des erreurs
-      console.log('Tentative de connexion avec:', email);
+      // Utiliser systématiquement l'API Render
+      const baseUrl = 'https://food-force-api.onrender.com';
       
-      // Utiliser un proxy CORS pour contourner les restrictions
-      const corsProxyUrl = 'https://cors-anywhere.herokuapp.com/';
-      const apiUrl = 'https://food-force-api.onrender.com/api/auth/login';
-      const url = process.env.NODE_ENV === 'development' ? apiUrl : corsProxyUrl + apiUrl;
+      const url = new URL('/api/auth/login', baseUrl);
+      console.log('URL de connexion:', url.toString());
       
-      console.log('URL de connexion:', url);
-      
-      // Utiliser axios pour la requête
-      const response = await axios.post(url, { email, password }, {
+      // Effectuer la requête avec fetch
+      const fetchResponse = await fetch(url.toString(), {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
-          'Origin': window.location.origin
-        }
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ email, password })
       });
-      
-      // Simuler une réponse fetch pour maintenir la compatibilité avec le reste du code
-      const fetchResponse = {
-        ok: true,
-        status: 200,
-        json: async () => response.data
-      };
       
       // Vérifier si la réponse est OK
       if (!fetchResponse.ok) {
@@ -215,20 +204,20 @@ export const AuthProvider = ({ children }) => {
       }
       
       // Parser la réponse JSON
-      let responseData;
+      let response;
       try {
-        responseData = await fetchResponse.json();
-        console.log('Réponse API complète:', responseData);
+        response = await fetchResponse.json();
+        console.log('Réponse API complète:', response);
       } catch (jsonError) {
         console.error('Erreur lors du parsing JSON:', jsonError);
         throw new Error(`Erreur de format JSON: ${jsonError.message}`);
       }
       
       // Vérifier si la réponse contient un token et des données utilisateur
-      if (responseData && responseData.success && responseData.token) {
-        localStorage.setItem('token', responseData.token);
-        localStorage.setItem('user', JSON.stringify(responseData.user));
-        setUser(responseData.user);
+      if (response && response.success && response.token) {
+        localStorage.setItem('token', response.token);
+        localStorage.setItem('user', JSON.stringify(response.user));
+        setUser(response.user);
         setError(null);
         
         // Rediriger vers la page d'où l'utilisateur venait ou vers le tableau de bord approprié
@@ -239,16 +228,16 @@ export const AuthProvider = ({ children }) => {
           navigate(from, { replace: true });
         } else {
           // Sinon, rediriger vers le tableau de bord approprié en fonction du type d'utilisateur
-          const dashboardPath = responseData.user.userType === 'candidat' 
+          const dashboardPath = response.user.userType === 'candidat' 
             ? '/candidate/dashboard' 
             : '/establishment/dashboard';
           console.log('Redirection vers', dashboardPath);
           navigate(dashboardPath, { replace: true });
         }
         
-        return responseData.user;
+        return response.user;
       } else {
-        throw new Error(responseData?.message || 'Format de réponse invalide');
+        throw new Error(response?.message || 'Format de réponse invalide');
       }
     } catch (err) {
       console.error('Erreur de connexion:', err);

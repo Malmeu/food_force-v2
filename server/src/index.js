@@ -30,16 +30,28 @@ const PORT = process.env.PORT || 5000;
 
 // Configuration CORS détaillée
 const corsOptions = {
-  origin: [
-    'http://localhost:3000', 
-    'http://localhost:3001', 
-    'http://localhost:3002', 
-    'http://localhost:3003', 
-    'https://food-force-chi.vercel.app', 
-    'https://food-force-client.windsurf.build',
-    'https://food-force-v2-finale.vercel.app',
-    'https://food-force-v2-finale-malmeu.vercel.app'
-  ],
+  origin: function (origin, callback) {
+    // Permettre les requêtes sans origine (mobile apps, etc.)
+    if (!origin) return callback(null, true);
+    
+    // Liste des domaines autorisés
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://localhost:3001', 
+      'http://localhost:3002',
+      'http://localhost:3003',
+      'https://food-force-chi.vercel.app',
+      'https://food-force-client.windsurf.build',
+      'https://food-force-v2-finale.vercel.app'
+    ];
+    
+    // Vérifier si l'origine est dans la liste ou si c'est un domaine Vercel
+    if (allowedOrigins.includes(origin) || origin.includes('.vercel.app')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Non autorisé par CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Cache-Control', 'Pragma', 'Expires'],
   exposedHeaders: ['Content-Length', 'Content-Type'],
