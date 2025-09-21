@@ -17,11 +17,11 @@ const getUserFromCache = () => {
   }
 };
 
-// Du00e9terminer la baseURL en fonction de l'environnement
+// Déterminer la baseURL en fonction de l'environnement
 const isProduction = process.env.NODE_ENV === 'production';
 const AUTH_API_BASE_URL = isProduction 
   ? 'https://food-force-api.onrender.com/api'
-  : '/api'; // En du00e9veloppement, utilise le proxy configuru00e9 dans package.json
+  : 'https://food-force-api.onrender.com/api'; // Utiliser l'API Render même en développement
 
 // Log pour le du00e9bogage
 console.log(`Auth API configuru00e9e avec baseURL: ${AUTH_API_BASE_URL} (${isProduction ? 'production' : 'du00e9veloppement'})`);
@@ -179,14 +179,8 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       setError(null);
       
-      // Déterminer l'URL en fonction de l'environnement
-      const isProduction = process.env.NODE_ENV === 'production';
-      let baseUrl;
-      if (isProduction) {
-        baseUrl = 'https://food-force-api.onrender.com';
-      } else {
-        baseUrl = window.location.origin;
-      }
+      // Utiliser systématiquement l'API Render
+      const baseUrl = 'https://food-force-api.onrender.com';
       
       const url = new URL('/api/auth/login', baseUrl);
       console.log('URL de connexion:', url.toString());
