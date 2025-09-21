@@ -28,39 +28,37 @@ connectDB();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Configuration CORS détaillée
+// Configuration CORS détaillée - Solution temporaire plus permissive
 const corsOptions = {
-  origin: function (origin, callback) {
-    // Permettre les requêtes sans origine (mobile apps, etc.)
-    if (!origin) return callback(null, true);
-    
-    // Liste des domaines autorisés
-    const allowedOrigins = [
-      'http://localhost:3000',
-      'http://localhost:3001', 
-      'http://localhost:3002',
-      'http://localhost:3003',
-      'https://food-force-chi.vercel.app',
-      'https://food-force-client.windsurf.build',
-      'https://food-force-v2-finale.vercel.app'
-    ];
-    
-    // Vérifier si l'origine est dans la liste ou si c'est un domaine Vercel
-    if (allowedOrigins.includes(origin) || origin.includes('.vercel.app')) {
-      callback(null, true);
-    } else {
-      callback(new Error('Non autorisé par CORS'));
-    }
-  },
+  origin: true, // Temporairement autoriser toutes les origines
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Cache-Control', 'Pragma', 'Expires'],
   exposedHeaders: ['Content-Length', 'Content-Type'],
   credentials: true,
+  optionsSuccessStatus: 200, // Pour les anciens navigateurs
+  preflightContinue: false,
   maxAge: 86400 // 24 heures
 };
 
 // Middlewares
 app.use(cors(corsOptions));
+
+// Middleware CORS manuel supplémentaire pour s'assurer que les headers sont définis
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Cache-Control, Pragma, Expires');
+  
+  // Gérer les requêtes preflight OPTIONS
+  if (req.method === 'OPTIONS') {
+    res.header('Access-Control-Max-Age', '86400');
+    return res.status(200).end();
+  }
+  
+  next();
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
