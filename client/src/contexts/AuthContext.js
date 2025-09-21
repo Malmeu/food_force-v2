@@ -26,14 +26,14 @@ const AUTH_API_BASE_URL = isProduction
 // Log pour le du00e9bogage
 console.log(`Auth API configuru00e9e avec baseURL: ${AUTH_API_BASE_URL} (${isProduction ? 'production' : 'du00e9veloppement'})`);
 
-// Cru00e9er une instance axios avec la configuration de base pour l'authentification
+// Créer une instance axios avec la configuration de base pour l'authentification
 const authAxios = axios.create({
   baseURL: AUTH_API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
-    // Suppression des en-têtes problématiques pour CORS
   },
+  withCredentials: true, // Important pour CORS avec credentials
   timeout: 15000 // 15 secondes de timeout pour donner plus de temps aux requêtes
 });
 
@@ -192,6 +192,7 @@ export const AuthProvider = ({ children }) => {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
+        credentials: 'include', // Important pour les cookies et CORS
         body: JSON.stringify({ email, password })
       });
       

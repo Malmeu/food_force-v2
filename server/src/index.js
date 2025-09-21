@@ -28,36 +28,32 @@ connectDB();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Configuration CORS détaillée - Solution temporaire plus permissive
+// Configuration CORS selon la documentation recommandée
+const allowedOrigins = [
+  'https://food-force-v2-finale.vercel.app', // Production
+  'http://localhost:3000', // Développement local
+  'http://localhost:3001'  // Développement local alternatif
+];
+
 const corsOptions = {
-  origin: true, // Temporairement autoriser toutes les origines
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Cache-Control', 'Pragma', 'Expires'],
-  exposedHeaders: ['Content-Length', 'Content-Type'],
+  origin: function (origin, callback) {
+    // Autorise les requêtes sans origin (mobile apps, Postman)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
-  optionsSuccessStatus: 200, // Pour les anciens navigateurs
-  preflightContinue: false,
-  maxAge: 86400 // 24 heures
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  optionsSuccessStatus: 200 // Pour les anciens navigateurs
 };
 
 // Middlewares
 app.use(cors(corsOptions));
-
-// Middleware CORS manuel supplémentaire pour s'assurer que les headers sont définis
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Cache-Control, Pragma, Expires');
-  
-  // Gérer les requêtes preflight OPTIONS
-  if (req.method === 'OPTIONS') {
-    res.header('Access-Control-Max-Age', '86400');
-    return res.status(200).end();
-  }
-  
-  next();
-});
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
