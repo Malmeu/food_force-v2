@@ -185,13 +185,15 @@ export const AuthProvider = ({ children }) => {
       const url = new URL('/api/auth/login', baseUrl);
       console.log('URL de connexion:', url.toString());
       
-      // Effectuer la requête avec fetch
+      // Effectuer la requête avec fetch et gérer les problèmes CORS
       const fetchResponse = await fetch(url.toString(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Accept': 'application/json',
+          'Origin': window.location.origin
         },
+        mode: 'cors',
         body: JSON.stringify({ email, password })
       });
       
