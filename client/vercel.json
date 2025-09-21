@@ -1,28 +1,5 @@
 {
-  "buildCommand": "npm run vercel-build",
-  "outputDirectory": "build",
-  "installCommand": "npm install",
-  "framework": "create-react-app",
   "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
-  ],
-  "routes": [
-    { "handle": "filesystem" },
-    { "src": "/[^.]+", "dest": "/index.html" }
-  ],
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        { "key": "Cache-Control", "value": "s-maxage=1, stale-while-revalidate" }
-      ]
-    }
-  ],
-  "env": {
-    "REACT_APP_API_URL": "https://food-force-api.onrender.com/api",
-    "CI": "false"
-  }
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }
